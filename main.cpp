@@ -4,7 +4,7 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
-const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_0-4_確認課題";
+const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_0-5_確認課題";
 
 //関数
 //行列の加法
