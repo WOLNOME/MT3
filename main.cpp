@@ -1,25 +1,26 @@
 #include <Novice.h>
+#include <assert.h>
+#include "Vector3.h"
 #include "Matrix4x4.h"
 
-const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_0-2_確認課題";
+const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_0-3_確認課題";
 
 //関数
-//行列の加法
-Matrix4x4 Add(const Matrix4x4& m1, const Matrix4x4& m2);
-//行列の減法
-Matrix4x4 Subtract(const Matrix4x4& m1, const Matrix4x4& m2);
-//行列の積
-Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2);
-//逆行列
-Matrix4x4 Inverse(const Matrix4x4& m);
-//転置行列
-Matrix4x4 Transpose(const Matrix4x4& m);
-//単位行列
-Matrix4x4 MakeIdentity4x4();
+
 //数値表示
-const int kRowHeight = 20;
 const int kColumnWidth = 60;
+const int kRowHeight = 20;
+void VectorScreenPrintf(int x, int y, const Vector3& vector, const char* label);
 void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* name);
+
+//平行移動行列
+Matrix4x4 MakeTranslateMatrix(const Vector3& translate);
+//拡大縮小行列
+Matrix4x4 MakeScaleMatrix(const Vector3& scale);
+//座標変換
+Vector3 Transform(const Vector3& vector, const Matrix4x4& matrix);
+
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -40,33 +41,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Novice::GetHitKeyStateAll(keys);
 
 		//初期化
-		Matrix4x4 m1 = {
-			3.2f,0.7f,9.6f,4.4f,
-			5.5f,1.3f,7.8f,2.1f,
-			6.9f,8.0f,2.6f,1.0f,
-			0.5f,7.2f,5.1f,3.3f
+		Vector3 translate{ 4.1f,2.6f,0.8f };
+		Vector3 scale{ 1.5f,5.2f,7.3f };
+		Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
+		Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
+		Vector3 point{ 2.3f,3.8f,1.4f };
+		Matrix4x4 transformmatrix = {
+			1.0f,2.0f,3.0f,4.0f,
+			3.0f,1.0f,1.0f,2.0f,
+			1.0f,4.0f,2.0f,3.0f,
+			2.0f,2.0f,1.0f,3.0f
 		};
-
-		Matrix4x4 m2 = {
-			4.1f,6.5f,3.3f,2.2f,
-			8.8f,0.6f,9.9f,7.7f,
-			1.1f,5.5f,6.6f,0.0f,
-			3.3f,9.9f,8.8f,2.2f
-		};
-
-		Matrix4x4 resultAdd = Add(m1, m2);
-		Matrix4x4 resultMultiply = Multiply(m1, m2);
-		Matrix4x4 resultSubtract = Subtract(m1, m2);
-		Matrix4x4 inverseM1 = Inverse(m1);
-		Matrix4x4 inverseM2 = Inverse(m2);
-		Matrix4x4 transposeM1 = Transpose(m1);
-		Matrix4x4 transposeM2 = Transpose(m2);
-		Matrix4x4 identity = MakeIdentity4x4();
-
-
+		Vector3 transformed = Transform(point, transformmatrix);
 		///
 		/// ↓更新処理ここから
 		///
+
+		VectorScreenPrintf(0, 0, transformed, "transformed");
+		MatrixScreenPrintf(0, kRowHeight, translateMatrix, "translateMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 6, scaleMatrix, "scaleMatrix");
+
 
 		///
 		/// ↑更新処理ここまで
@@ -76,14 +70,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 0, resultAdd, "Add");
-		MatrixScreenPrintf(0, kRowHeight * 5, resultSubtract, "Subtract");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 2, resultMultiply, "Multiply");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 3, inverseM1, "inverseM1");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 4, inverseM2, "inverseM2");
-		MatrixScreenPrintf(kColumnWidth * 5, 0, transposeM1, "transplseM1");
-		MatrixScreenPrintf(kColumnWidth * 5, kRowHeight * 5, transposeM2, "transplseM2");
-		MatrixScreenPrintf(kColumnWidth * 5, kRowHeight * 5 * 2, identity, "identity");
 
 
 		///
@@ -247,6 +233,14 @@ Matrix4x4 MakeIdentity4x4()
 	return c;
 }
 
+void VectorScreenPrintf(int x, int y, const Vector3& vector, const char* label)
+{
+	Novice::ScreenPrintf(x, y, "%.02f", vector.x);
+	Novice::ScreenPrintf(x + kColumnWidth, y, "%.02f", vector.y);
+	Novice::ScreenPrintf(x + kColumnWidth * 2, y, "%.02f", vector.z);
+	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
+}
+
 void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* name)
 {
 	Novice::ScreenPrintf(x, y, "%s", name);
@@ -255,4 +249,62 @@ void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* name)
 			Novice::ScreenPrintf(x + column * kColumnWidth, y + (row + 1) * kRowHeight, "%6.02f", matrix.m[row][column]);
 		}
 	}
+}
+
+Matrix4x4 MakeTranslateMatrix(const Vector3& translate)
+{
+	Matrix4x4 c;
+	c.m[0][0] = 1;
+	c.m[0][1] = 0;
+	c.m[0][2] = 0;
+	c.m[0][3] = 0;
+	c.m[1][0] = 0;
+	c.m[1][1] = 1;
+	c.m[1][2] = 0;
+	c.m[1][3] = 0;
+	c.m[2][0] = 0;
+	c.m[2][1] = 0;
+	c.m[2][2] = 1;
+	c.m[2][3] = 0;
+	c.m[3][0] = translate.x;
+	c.m[3][1] = translate.y;
+	c.m[3][2] = translate.z;
+	c.m[3][3] = 1;
+	return c;
+}
+
+Matrix4x4 MakeScaleMatrix(const Vector3& scale)
+{
+	Matrix4x4 c;
+	c.m[0][0] = scale.x;
+	c.m[0][1] = 0;
+	c.m[0][2] = 0;
+	c.m[0][3] = 0;
+	c.m[1][0] = 0;
+	c.m[1][1] = scale.y;
+	c.m[1][2] = 0;
+	c.m[1][3] = 0;
+	c.m[2][0] = 0;
+	c.m[2][1] = 0;
+	c.m[2][2] = scale.z;
+	c.m[2][3] = 0;
+	c.m[3][0] = 0;
+	c.m[3][1] = 0;
+	c.m[3][2] = 0;
+	c.m[3][3] = 1;
+	return c;
+}
+
+Vector3 Transform(const Vector3& vector, const Matrix4x4& matrix)
+{
+	Vector3 result;
+	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + 1.0f * matrix.m[3][0];
+	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + 1.0f * matrix.m[3][1];
+	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + 1.0f * matrix.m[3][2];
+	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + 1.0f * matrix.m[3][3];
+	assert(w != 0.0f);
+	result.x /= w;
+	result.y /= w;
+	result.z /= w;
+	return result;
 }
