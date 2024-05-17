@@ -34,6 +34,12 @@ struct Segment {
 	Vector3 origin;//始点
 	Vector3 diff;//終点への差分ベクトル
 };
+//平面
+struct Plane {
+	Vector3 normal;//法線
+	float distance;//距離
+};
+
 
 //関数
 
@@ -42,7 +48,9 @@ Vector3 Add(const Vector3& v1, const Vector3& v2);
 //ベクトルの減法
 Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 //ベクトルの積
+Vector3 Multiply(const float& s, const Vector3& v);
 float Multiply(const Vector3& v1, const Vector3& v2);
+
 
 //行列の加法
 Matrix4x4 Add(const Matrix4x4& m1, const Matrix4x4& m2);
@@ -103,10 +111,18 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 Vector3 Project(const Vector3& v1, const Vector3& v2);
 //最近接点
 Vector3 ClosestPoint(const Vector3& point, const Segment& segment);
-//二点間の距離
-float Length(const Vector3& v1, const Vector3& v2);
+//ベクトルの長さ
+float Length(const Vector3& v);
 //球同士の当たり判定
 bool isCollision(const Sphere& s1, const Sphere& s2);
+//ベクトルの正規化
+Vector3 Normalize(const Vector3& v);
+//平面の法線から矩形を構成する4頂点をもとめる関数
+Vector3 Perpendicular(const Vector3& vector);
+//平面の描画
+void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
+//平面と球の当たり判定
+bool isCollision(const Plane& plane, const Sphere& sphere);
 
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -120,16 +136,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	//球1
-	Sphere s1;
-	s1.center = { -1.0f,0.0f,-1.0f };
-	s1.radius = 1.0f;
+	//平面
+	Plane p;
+	p.normal = { 0.0f,1.0f,0.0f };
+	p.distance = 1.0f;
 	uint32_t color1 = 0xffffffff;
-	
-	//球2
-	Sphere s2;
-	s2.center = { 1.0f,0.0f,1.0f };
-	s2.radius = 1.0f;
+
+	//球
+	Sphere s;
+	s.center = { 0.0f,0.0f,0.0f };
+	s.radius = 0.5f;
 	uint32_t color2 = 0xffffffff;
 
 
@@ -155,11 +171,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(s1, s2)) {
-			color1 = 0xff0000ff;
+		if (isCollision(p,s)) {
+			color2 = 0xff0000ff;
 		}
 		else {
-			color1 = 0xffffffff;
+			color2 = 0xffffffff;
 		}
 
 
@@ -180,10 +196,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//球1
-		DrawSphere(s1, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//球2
-		DrawSphere(s2, worldViewProjectionMatrix, viewPortMatrix, color2);
+		//平面
+		DrawPlane(p, worldViewProjectionMatrix, viewPortMatrix, color1);
+		//球
+		DrawSphere(s, worldViewProjectionMatrix, viewPortMatrix, color2);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -193,10 +209,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("s1.c", &s1.center.x, 0.01f);
-		ImGui::DragFloat("s1.c", &s1.radius, 0.01f);
-		ImGui::DragFloat3("s2.c", &s2.center.x, 0.01f);
-		ImGui::DragFloat("s2.c", &s2.radius, 0.01f);
+		ImGui::DragFloat3("s.c", &s.center.x, 0.01f);
+		ImGui::DragFloat("s.r", &s.radius, 0.01f);
+		ImGui::DragFloat3("p.n", &p.normal.x, 0.01f);
+		ImGui::DragFloat("p.d", &p.distance, 0.01f);
 
 		ImGui::End();
 
@@ -237,6 +253,15 @@ Vector3 Subtract(const Vector3& v1, const Vector3& v2)
 		v1.y - v2.y,
 		v1.z - v2.z
 	};
+	return c;
+}
+
+Vector3 Multiply(const float& s, const Vector3& v)
+{
+	Vector3 c;
+	c.x = s * v.x;
+	c.y = s * v.y;
+	c.z = s * v.z;
 	return c;
 }
 
@@ -786,17 +811,17 @@ Vector3 ClosestPoint(const Vector3& point, const Segment& segment)
 	return cp;
 }
 
-float Length(const Vector3& v1, const Vector3& v2)
+float Length(const Vector3& v)
 {
 	float c;
-	c = sqrtf(powf(v1.x - v2.x, 2) + powf(v1.y - v2.y, 2) + powf(v1.z - v2.z, 2));
+	c = sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2));
 	return c;
 }
 
 bool isCollision(const Sphere& s1, const Sphere& s2)
 {
 	//2つの球の中心点間の距離を求める
-	float distance = Length(s1.center, s2.center);
+	float distance = Length(Subtract(s2.center, s1.center));
 	//半径の合計よりも短ければ衝突
 	if (distance <= s1.radius + s2.radius) {
 		return true;
@@ -805,3 +830,79 @@ bool isCollision(const Sphere& s1, const Sphere& s2)
 		return false;
 	}
 }
+
+Vector3 Normalize(const Vector3& v)
+{
+	Vector3 c;
+	//長さを求める
+	float length = Length(v);
+	//length=0で無ければ正規化
+	if (length != 0) {
+		c.x = v.x / length;
+		c.y = v.y / length;
+		c.z = v.z / length;
+	}
+	else {
+		assert("正規化できません");
+	}
+	return c;
+}
+
+Vector3 Perpendicular(const Vector3& vector)
+{
+	if (vector.x != 0.0f || vector.y != 0.0f) {
+		return { -vector.y,vector.x,0.0f };
+	}
+	//法線がz成分のみなら
+	return{ 0.0f,-vector.z,vector.y };
+}
+
+void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	//平面の中心を求める
+	Vector3 center = Multiply(plane.distance, plane.normal);
+	//平面の頂点を求める
+	Vector3 perpendiculars[4];
+	perpendiculars[0] = Normalize(Perpendicular(plane.normal));//法線と垂直なベクトル
+	perpendiculars[1] = { -perpendiculars[0].x,-perpendiculars[0].y,-perpendiculars[0].z };//0の逆ベクトル
+	perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);//0と法線のクロス積
+	perpendiculars[3] = { -perpendiculars[2].x,-perpendiculars[2].y,-perpendiculars[2].z };//2の逆ベクトル
+	//以上のベクトルを中心点に定数倍して足すと4頂点が完成
+	Vector3 points[4];
+	for (int32_t index = 0; index < 4; ++index) {
+		Vector3 extend = Multiply(2.0f, perpendiculars[index]);
+		Vector3 point = Add(center, extend);
+		points[index] = Transform(Transform(point, viewProjectionMatrix), viewportMatrix);
+	}
+	//pointsをそれぞれ結んでDrawlineで矩形を描画する
+	/*for (uint32_t i = 0; i < 4; ++i) {
+		uint32_t j = i + 1;
+		if (j > 3) {
+			j = 0;
+		}
+		Novice::DrawLine((int)points[i].x, (int)points[i].y, (int)points[j].x, (int)points[j].y, color);
+	}*/
+	Novice::DrawLine((int)points[0].x, (int)points[0].y, (int)points[2].x, (int)points[2].y, color);
+	Novice::DrawLine((int)points[1].x, (int)points[1].y, (int)points[3].x, (int)points[3].y, color);
+	Novice::DrawLine((int)points[2].x, (int)points[2].y, (int)points[1].x, (int)points[1].y, color);
+	Novice::DrawLine((int)points[3].x, (int)points[3].y, (int)points[0].x, (int)points[0].y, color);
+}
+
+bool isCollision(const Plane& plane, const Sphere& sphere)
+{
+	//球の中心と平面との距離を計算
+	float distance;
+	float k;
+	k = sqrtf(powf(Multiply(plane.normal, sphere.center) - plane.distance,2));
+	Vector3 q;//球の中心から平面に垂直に線を下したときに交わる点
+	q = Subtract(sphere.center, Multiply(k, plane.normal));
+	distance = Length(Subtract(sphere.center,q));
+	//衝突判定
+	if (distance <= sphere.radius) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
