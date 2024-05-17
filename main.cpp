@@ -6,7 +6,7 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
-const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_1-1_確認課題";
+const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_2-1_確認課題";
 
 //定数
 const int  kWindowWidth = 1280;
@@ -103,6 +103,11 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 Vector3 Project(const Vector3& v1, const Vector3& v2);
 //最近接点
 Vector3 ClosestPoint(const Vector3& point, const Segment& segment);
+//二点間の距離
+float Length(const Vector3& v1, const Vector3& v2);
+//球同士の当たり判定
+bool isCollision(const Sphere& s1, const Sphere& s2);
+
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -115,15 +120,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	Segment segment = {
-		{-2.0f,-1.0f,0.0f},
-		{3.0f,2.0f,2.0f}
-	};
-	Vector3 point = { -1.5f,0.6f,0.6f };
-
-	Vector3 project = Project(Subtract(point, segment.origin), segment.diff);
-	Vector3 closestPoint = ClosestPoint(point, segment);
-
+	//球1
+	Sphere s1;
+	s1.center = { -1.0f,0.0f,-1.0f };
+	s1.radius = 1.0f;
+	uint32_t color1 = 0xffffffff;
+	
+	//球2
+	Sphere s2;
+	s2.center = { 1.0f,0.0f,1.0f };
+	s2.radius = 1.0f;
+	uint32_t color2 = 0xffffffff;
 
 
 	//カメラの座標と角度
@@ -147,6 +154,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//カメラの移動
 
+		//当たり判定処理
+		if (isCollision(s1, s2)) {
+			color1 = 0xff0000ff;
+		}
+		else {
+			color1 = 0xffffffff;
+		}
 
 
 		//各種行列の計算
@@ -166,16 +180,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//点
-		Sphere pointSphere{ point,0.01f };
-		Sphere closestPointSphere{ closestPoint,0.01f };
-		DrawSphere(pointSphere, worldViewProjectionMatrix, viewPortMatrix, RED);
-		DrawSphere(closestPointSphere, worldViewProjectionMatrix, viewPortMatrix, BLACK);
-
-		//線分
-		Vector3 start = Transform(Transform(segment.origin, worldViewProjectionMatrix), viewPortMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), worldViewProjectionMatrix), viewPortMatrix);
-		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
+		//球1
+		DrawSphere(s1, worldViewProjectionMatrix, viewPortMatrix, color1);
+		//球2
+		DrawSphere(s2, worldViewProjectionMatrix, viewPortMatrix, color2);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -185,10 +193,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::InputFloat3("Point", &point.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment origin", &segment.origin.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment diff", &segment.diff.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::DragFloat3("s1.c", &s1.center.x, 0.01f);
+		ImGui::DragFloat("s1.c", &s1.radius, 0.01f);
+		ImGui::DragFloat3("s2.c", &s2.center.x, 0.01f);
+		ImGui::DragFloat("s2.c", &s2.radius, 0.01f);
+
 		ImGui::End();
 
 		///
@@ -775,4 +784,24 @@ Vector3 ClosestPoint(const Vector3& point, const Segment& segment)
 		segment.origin.z + proj.z
 	};
 	return cp;
+}
+
+float Length(const Vector3& v1, const Vector3& v2)
+{
+	float c;
+	c = sqrtf(powf(v1.x - v2.x, 2) + powf(v1.y - v2.y, 2) + powf(v1.z - v2.z, 2));
+	return c;
+}
+
+bool isCollision(const Sphere& s1, const Sphere& s2)
+{
+	//2つの球の中心点間の距離を求める
+	float distance = Length(s1.center, s2.center);
+	//半径の合計よりも短ければ衝突
+	if (distance <= s1.radius + s2.radius) {
+		return true;
+	}
+	else {
+		return false;
+	}
 }
