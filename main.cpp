@@ -49,7 +49,8 @@ Vector3 Add(const Vector3& v1, const Vector3& v2);
 Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 //ベクトルの積
 Vector3 Multiply(const float& s, const Vector3& v);
-float Multiply(const Vector3& v1, const Vector3& v2);
+//ベクトルの内積
+float Dot(const Vector3& v1, const Vector3& v2);
 
 
 //行列の加法
@@ -123,6 +124,14 @@ Vector3 Perpendicular(const Vector3& vector);
 void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 //平面と球の当たり判定
 bool isCollision(const Plane& plane, const Sphere& sphere);
+//直線と平面の当たり判定
+bool isCollision(const Line& segment, const Plane& plane);
+//半直線と平面の当たり判定
+bool isCollision(const Ray& segment, const Plane& plane);
+//線分と平面の当たり判定
+bool isCollision(const Segment& segment, const Plane& plane);
+//線分の描画
+void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -142,10 +151,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	p.distance = 1.0f;
 	uint32_t color1 = 0xffffffff;
 
-	//球
-	Sphere s;
-	s.center = { 0.0f,0.0f,0.0f };
-	s.radius = 0.5f;
+	//線分
+	Segment segment;
+	segment.diff = { 1.0f,1.0f,1.0f };
+	segment.origin = { 0.0f,0.0f,0.0f };
 	uint32_t color2 = 0xffffffff;
 
 
@@ -171,7 +180,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(p,s)) {
+		if (isCollision(segment,p)) {
 			color2 = 0xff0000ff;
 		}
 		else {
@@ -198,9 +207,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//平面
 		DrawPlane(p, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//球
-		DrawSphere(s, worldViewProjectionMatrix, viewPortMatrix, color2);
-
+		//線分
+		DrawSegment(segment, worldViewProjectionMatrix, viewPortMatrix, color2);
+		
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
 
@@ -209,8 +218,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("s.c", &s.center.x, 0.01f);
-		ImGui::DragFloat("s.r", &s.radius, 0.01f);
+		ImGui::DragFloat3("seg.d", &segment.diff.x, 0.01f);
+		ImGui::DragFloat3("seg.o", &segment.origin.x, 0.01f);
 		ImGui::DragFloat3("p.n", &p.normal.x, 0.01f);
 		ImGui::DragFloat("p.d", &p.distance, 0.01f);
 
@@ -265,7 +274,7 @@ Vector3 Multiply(const float& s, const Vector3& v)
 	return c;
 }
 
-float Multiply(const Vector3& v1, const Vector3& v2)
+float Dot(const Vector3& v1, const Vector3& v2)
 {
 	float c;
 	c = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
@@ -874,14 +883,6 @@ void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
 		Vector3 point = Add(center, extend);
 		points[index] = Transform(Transform(point, viewProjectionMatrix), viewportMatrix);
 	}
-	//pointsをそれぞれ結んでDrawlineで矩形を描画する
-	/*for (uint32_t i = 0; i < 4; ++i) {
-		uint32_t j = i + 1;
-		if (j > 3) {
-			j = 0;
-		}
-		Novice::DrawLine((int)points[i].x, (int)points[i].y, (int)points[j].x, (int)points[j].y, color);
-	}*/
 	Novice::DrawLine((int)points[0].x, (int)points[0].y, (int)points[2].x, (int)points[2].y, color);
 	Novice::DrawLine((int)points[1].x, (int)points[1].y, (int)points[3].x, (int)points[3].y, color);
 	Novice::DrawLine((int)points[2].x, (int)points[2].y, (int)points[1].x, (int)points[1].y, color);
@@ -893,7 +894,7 @@ bool isCollision(const Plane& plane, const Sphere& sphere)
 	//球の中心と平面との距離を計算
 	float distance;
 	float k;
-	k = sqrtf(powf(Multiply(plane.normal, sphere.center) - plane.distance,2));
+	k = sqrtf(powf(Dot(plane.normal, sphere.center) - plane.distance,2));
 	Vector3 q;//球の中心から平面に垂直に線を下したときに交わる点
 	q = Subtract(sphere.center, Multiply(k, plane.normal));
 	distance = Length(Subtract(sphere.center,q));
@@ -904,5 +905,70 @@ bool isCollision(const Plane& plane, const Sphere& sphere)
 	else {
 		return false;
 	}
+}
+
+bool isCollision(const Line& line, const Plane& plane)
+{
+	//垂直判定を求める
+	float dot = Dot(plane.normal, line.diff);
+	//平行の場合衝突していない。
+	if (dot == 0.0f) {
+		return false;
+	}
+	//tを求める
+	float t = (plane.distance - Dot(line.origin, plane.normal)) / dot;
+	//直線の当たり判定
+	if (t >= 0 || t < 0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool isCollision(const Ray& ray, const Plane& plane)
+{
+	//垂直判定を求める
+	float dot = Dot(plane.normal, ray.diff);
+	//平行の場合衝突していない。
+	if (dot == 0.0f) {
+		return false;
+	}
+	//tを求める
+	float t = (plane.distance - Dot(ray.origin, plane.normal)) / dot;
+	//半直線の当たり判定
+	if (t >= 0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool isCollision(const Segment& segment, const Plane& plane)
+{
+	//平行判定
+	float dot = Dot(segment.diff, plane.normal);
+	if (dot == 0.0f) {
+		return false;
+	}
+
+	//媒介変数
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+
+	//当たり判定結果
+	if (t >= 0 && t <= 1) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
+	Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
+	Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), color);
 }
 
