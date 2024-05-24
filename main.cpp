@@ -221,6 +221,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("seg.d", &segment.diff.x, 0.01f);
 		ImGui::DragFloat3("seg.o", &segment.origin.x, 0.01f);
 		ImGui::DragFloat3("p.n", &p.normal.x, 0.01f);
+		p.normal = Normalize(p.normal);
 		ImGui::DragFloat("p.d", &p.distance, 0.01f);
 
 		ImGui::End();
@@ -957,7 +958,7 @@ bool isCollision(const Segment& segment, const Plane& plane)
 	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
 
 	//当たり判定結果
-	if (t >= 0 && t <= 1) {
+	if (t > 0 && t < 1) {
 		return true;
 	}
 	else {
