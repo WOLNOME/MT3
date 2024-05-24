@@ -6,7 +6,7 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
-const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_2-1_確認課題";
+const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_2-4_確認課題";
 
 //定数
 const int  kWindowWidth = 1280;
@@ -38,6 +38,10 @@ struct Segment {
 struct Plane {
 	Vector3 normal;//法線
 	float distance;//距離
+};
+//三角形
+struct Triangle {
+	Vector3 vertices[3];
 };
 
 
@@ -93,7 +97,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
 // 余接
 float Cot(float rad);
 //透視投影行列
-Matrix4x4 MakePerspectiveForMatrix(float fovY, float aspectRatio, float nearClip, float farClip);
+Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip);
 //正射影行列
 Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearClip, float farClip);
 //ビューポート変換行列
@@ -132,7 +136,10 @@ bool isCollision(const Ray& segment, const Plane& plane);
 bool isCollision(const Segment& segment, const Plane& plane);
 //線分の描画
 void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
-
+//線分と三角形の当たり判定
+bool isCollision(const Segment& segment, const Triangle& triangle);
+//三角形の描画
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -145,10 +152,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	//平面
-	Plane p;
-	p.normal = { 0.0f,1.0f,0.0f };
-	p.distance = 1.0f;
+	//三角形
+	Triangle triangle;
+	triangle.vertices[0] = { -1.0f,0.0f,0.0f };
+	triangle.vertices[1] = { 0.0f,1.0f,0.0f };
+	triangle.vertices[2] = { 1.0f,0.0f,0.0f };
 	uint32_t color1 = 0xffffffff;
 
 	//線分
@@ -180,7 +188,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(segment,p)) {
+		if (isCollision(segment, triangle)) {
 			color2 = 0xff0000ff;
 		}
 		else {
@@ -192,7 +200,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
 		Matrix4x4 cameraMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, cameraRotate, cameraTranslate);
 		Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-		Matrix4x4 projectionMatrix = MakePerspectiveForMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
+		Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
 		Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 		Matrix4x4 viewPortMatrix = makeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
@@ -206,10 +214,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		//平面
-		DrawPlane(p, worldViewProjectionMatrix, viewPortMatrix, color1);
+		DrawTriangle(triangle, worldViewProjectionMatrix, viewPortMatrix, color1);
 		//線分
 		DrawSegment(segment, worldViewProjectionMatrix, viewPortMatrix, color2);
-		
+
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
 
@@ -218,11 +226,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
+		ImGui::DragFloat3("tri0", &triangle.vertices[0].x, 0.01f);
+		ImGui::DragFloat3("tri1", &triangle.vertices[1].x, 0.01f);
+		ImGui::DragFloat3("tri2", &triangle.vertices[2].x, 0.01f);
 		ImGui::DragFloat3("seg.d", &segment.diff.x, 0.01f);
 		ImGui::DragFloat3("seg.o", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("p.n", &p.normal.x, 0.01f);
-		ImGui::DragFloat("p.d", &p.distance, 0.01f);
-
 		ImGui::End();
 
 		///
@@ -604,7 +612,7 @@ float Cot(float rad)
 	return c;
 }
 
-Matrix4x4 MakePerspectiveForMatrix(float fovY, float aspectRatio, float nearClip, float farClip)
+Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip)
 {
 	Matrix4x4 c;
 	c.m[0][0] = (1 / aspectRatio) * Cot(fovY / 2);
@@ -894,10 +902,10 @@ bool isCollision(const Plane& plane, const Sphere& sphere)
 	//球の中心と平面との距離を計算
 	float distance;
 	float k;
-	k = sqrtf(powf(Dot(plane.normal, sphere.center) - plane.distance,2));
+	k = sqrtf(powf(Dot(plane.normal, sphere.center) - plane.distance, 2));
 	Vector3 q;//球の中心から平面に垂直に線を下したときに交わる点
 	q = Subtract(sphere.center, Multiply(k, plane.normal));
-	distance = Length(Subtract(sphere.center,q));
+	distance = Length(Subtract(sphere.center, q));
 	//衝突判定
 	if (distance <= sphere.radius) {
 		return true;
@@ -970,5 +978,67 @@ void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, 
 	Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
 	Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
 	Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), color);
+}
+
+bool isCollision(const Segment& segment, const Triangle& triangle)
+{
+	//三角形のある面を作る
+	Plane plane;
+	//三角形の座標から、法線nを求める
+	Vector3 vv1, vv2, n;
+	vv1 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+	vv2 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+	n = Normalize(Cross(vv1, vv2));
+	//ディスタンスを求める
+	float d = Dot(triangle.vertices[0], n);
+	//面に変換
+	plane.normal = n;
+	plane.distance = d;
+
+	//面と線の当たり判定
+	//接触点Pを求める
+	float dot = Dot(segment.diff, plane.normal);
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+	Vector3 p = Add(segment.origin, Multiply(t, segment.diff));
+	//当たり判定
+	if (isCollision(segment, plane)) {
+		//必要なベクトル
+		Vector3 v01 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+		Vector3 v12 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+		Vector3 v20 = Subtract(triangle.vertices[0], triangle.vertices[2]);
+		Vector3 v0p = Subtract(p, triangle.vertices[0]);
+		Vector3 v1p = Subtract(p, triangle.vertices[1]);
+		Vector3 v2p = Subtract(p, triangle.vertices[2]);
+		//各辺を結んだベクトルと、頂点の衝突点pを結んだベクトルのクロス積を取る
+		Vector3 cross01 = Cross(v01, v1p);
+		Vector3 cross12 = Cross(v12, v2p);
+		Vector3 cross20 = Cross(v20, v0p);
+		//全ての小三角形のクロス積と法線が同じ方向を向いていたら衝突
+		if (Dot(cross01, plane.normal) >= 0.0f &&
+			Dot(cross12, plane.normal) >= 0.0f &&
+			Dot(cross20, plane.normal) >= 0.0f) {
+			//衝突
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	else {
+		return false;
+	}
+}
+
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	//三角形の各頂点
+	Vector3 triangleVertex[3];
+	triangleVertex[0] = Transform(Transform(triangle.vertices[0], viewProjectionMatrix), viewportMatrix);
+	triangleVertex[1] = Transform(Transform(triangle.vertices[1], viewProjectionMatrix), viewportMatrix);
+	triangleVertex[2] = Transform(Transform(triangle.vertices[2], viewProjectionMatrix), viewportMatrix);
+	//描画
+	Novice::DrawTriangle((int)triangleVertex[0].x, (int)triangleVertex[0].y, (int)triangleVertex[1].x, (int)triangleVertex[1].y, (int)triangleVertex[2].x, (int)triangleVertex[2].y, color, kFillModeWireFrame);
+
+
 }
 
