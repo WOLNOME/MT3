@@ -3,6 +3,7 @@
 #include <cmath>
 #include <assert.h>
 #include <imgui.h>
+#include <algorithm>
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
@@ -146,10 +147,15 @@ void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, 
 bool isCollision(const Segment& segment, const Triangle& triangle);
 //三角形の描画
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
-//AABB同士の衝突判定
+//AABB同士の当たり判定
 bool isCollision(const AABB& a, const AABB& b);
 //AABBの描画
 void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
+//AABBと球の中心の最近接点
+Vector3 ClosestPoint(const AABB& aabb, const Sphere& sphere);
+//AABBと球の当たり判定
+bool isCollision(const AABB& aabb, const Sphere& sphere);
+
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -162,24 +168,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	AABB aabb1{
+	//aabb
+	AABB aabb{
 		.min{-0.5f,-0.5f,-0.5f},
 		.max{0.0f,0.0f,0.0f},
 	};
 	uint32_t color1 = 0xffffffff;
-
-	AABB aabb2{
-		.min{0.2f,0.2f,0.2f},
-		.max{1.0f,1.0f,1.0f},
-	};
+	//球
+	Sphere sphere;
+	sphere.center = { 0.0f,0.0f,0.0f };
+	sphere.radius = 1.0f;
 	uint32_t color2 = 0xffffffff;
 
-	aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
-	aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
-	aabb1.min.y = (std::min)(aabb1.min.y, aabb1.max.y);
-	aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
-	aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
-	aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
+
+	aabb.min.x = (std::min)(aabb.min.x, aabb.max.x);
+	aabb.max.x = (std::max)(aabb.min.x, aabb.max.x);
+	aabb.min.y = (std::min)(aabb.min.y, aabb.max.y);
+	aabb.max.y = (std::max)(aabb.min.y, aabb.max.y);
+	aabb.min.z = (std::min)(aabb.min.z, aabb.max.z);
+	aabb.max.z = (std::max)(aabb.min.z, aabb.max.z);
 
 
 	//カメラの座標と角度
@@ -204,7 +211,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(aabb1, aabb2)) {
+		if (isCollision(aabb, sphere)) {
 			color1 = 0xff0000ff;
 		}
 		else {
@@ -228,11 +235,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//aabb1
-		DrawAABB(aabb1, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//aabb2
-		DrawAABB(aabb2, worldViewProjectionMatrix, viewPortMatrix, color2);
-
+		//aabb
+		DrawAABB(aabb, worldViewProjectionMatrix, viewPortMatrix, color1);
+		//球
+		DrawSphere(sphere, worldViewProjectionMatrix, viewPortMatrix, color2);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -242,10 +248,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("aabb1 min", &aabb1.min.x, 0.01f);
-		ImGui::DragFloat3("aabb1 max", &aabb1.max.x, 0.01f);
-		ImGui::DragFloat3("aabb2 min", &aabb2.min.x, 0.01f);
-		ImGui::DragFloat3("aabb2 max", &aabb2.max.x, 0.01f);
+		ImGui::DragFloat3("aabb min", &aabb.min.x, 0.01f);
+		ImGui::DragFloat3("aabb max", &aabb.max.x, 0.01f);
+		ImGui::DragFloat3("sphere center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("sphere radius", &sphere.radius, 0.01f);
 		ImGui::End();
 
 		///
@@ -1101,5 +1107,30 @@ void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Mat
 		Novice::DrawLine((int)CubeVertex[i].x, (int)CubeVertex[i].y, (int)CubeVertex[i + 2].x, (int)CubeVertex[i + 2].y, color);
 	}
 
+}
+
+Vector3 ClosestPoint(const AABB& aabb, const Sphere& sphere)
+{
+	Vector3 closestPoint{
+		std::clamp(sphere.center.x,aabb.min.x,aabb.max.x),
+		std::clamp(sphere.center.y,aabb.min.y,aabb.max.y),
+		std::clamp(sphere.center.z,aabb.min.z,aabb.max.z)
+	};
+	return closestPoint;
+}
+
+bool isCollision(const AABB& aabb, const Sphere& sphere)
+{
+	//球の中心とAABBとの最近接点を求める
+	Vector3 closestPoint = ClosestPoint(aabb, sphere);
+	//最近接点と球の中心の距離を求める
+	float distance = Length(Subtract(closestPoint, sphere.center));
+	//距離が平均よりも小さければ衝突
+	if (distance <= sphere.radius) {
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
