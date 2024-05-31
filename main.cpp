@@ -43,6 +43,12 @@ struct Plane {
 struct Triangle {
 	Vector3 vertices[3];
 };
+//AABB
+struct AABB {
+	Vector3 min;
+	Vector3 max;
+};
+
 
 
 //関数
@@ -140,6 +146,10 @@ void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, 
 bool isCollision(const Segment& segment, const Triangle& triangle);
 //三角形の描画
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
+//AABB同士の衝突判定
+bool isCollision(const AABB& a, const AABB& b);
+//AABBの描画
+void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -152,18 +162,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	//三角形
-	Triangle triangle;
-	triangle.vertices[0] = { -1.0f,0.0f,0.0f };
-	triangle.vertices[1] = { 0.0f,1.0f,0.0f };
-	triangle.vertices[2] = { 1.0f,0.0f,0.0f };
+	AABB aabb1{
+		.min{-0.5f,-0.5f,-0.5f},
+		.max{0.0f,0.0f,0.0f},
+	};
 	uint32_t color1 = 0xffffffff;
 
-	//線分
-	Segment segment;
-	segment.diff = { 1.0f,1.0f,1.0f };
-	segment.origin = { 0.0f,0.0f,0.0f };
+	AABB aabb2{
+		.min{0.2f,0.2f,0.2f},
+		.max{1.0f,1.0f,1.0f},
+	};
 	uint32_t color2 = 0xffffffff;
+
+	aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
+	aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
+	aabb1.min.y = (std::min)(aabb1.min.y, aabb1.max.y);
+	aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
+	aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
+	aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
 
 
 	//カメラの座標と角度
@@ -188,13 +204,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(segment, triangle)) {
-			color2 = 0xff0000ff;
+		if (isCollision(aabb1, aabb2)) {
+			color1 = 0xff0000ff;
 		}
 		else {
-			color2 = 0xffffffff;
+			color1 = 0xffffffff;
 		}
-
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -213,10 +228,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//平面
-		DrawTriangle(triangle, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//線分
-		DrawSegment(segment, worldViewProjectionMatrix, viewPortMatrix, color2);
+		//aabb1
+		DrawAABB(aabb1, worldViewProjectionMatrix, viewPortMatrix, color1);
+		//aabb2
+		DrawAABB(aabb2, worldViewProjectionMatrix, viewPortMatrix, color2);
+
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -226,11 +242,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("tri0", &triangle.vertices[0].x, 0.01f);
-		ImGui::DragFloat3("tri1", &triangle.vertices[1].x, 0.01f);
-		ImGui::DragFloat3("tri2", &triangle.vertices[2].x, 0.01f);
-		ImGui::DragFloat3("seg.d", &segment.diff.x, 0.01f);
-		ImGui::DragFloat3("seg.o", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("aabb1 min", &aabb1.min.x, 0.01f);
+		ImGui::DragFloat3("aabb1 max", &aabb1.max.x, 0.01f);
+		ImGui::DragFloat3("aabb2 min", &aabb2.min.x, 0.01f);
+		ImGui::DragFloat3("aabb2 max", &aabb2.max.x, 0.01f);
 		ImGui::End();
 
 		///
@@ -1039,6 +1054,52 @@ void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatri
 	//描画
 	Novice::DrawTriangle((int)triangleVertex[0].x, (int)triangleVertex[0].y, (int)triangleVertex[1].x, (int)triangleVertex[1].y, (int)triangleVertex[2].x, (int)triangleVertex[2].y, color, kFillModeWireFrame);
 
+
+}
+
+bool isCollision(const AABB& a, const AABB& b) {
+	if ((a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+		(a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+		(a.min.z <= b.max.z && a.max.z >= b.min.z)) {
+		//衝突
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	//立方体の各頂点
+	Vector3 CubeVertex[8];
+	CubeVertex[0] = Transform(Transform({ aabb.min.x,aabb.min.y,aabb.min.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[1] = Transform(Transform({ aabb.min.x,aabb.max.y,aabb.min.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[2] = Transform(Transform({ aabb.min.x,aabb.min.y,aabb.max.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[3] = Transform(Transform({ aabb.min.x,aabb.max.y,aabb.max.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[4] = Transform(Transform({ aabb.max.x,aabb.min.y,aabb.min.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[5] = Transform(Transform({ aabb.max.x,aabb.max.y,aabb.min.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[6] = Transform(Transform({ aabb.max.x,aabb.min.y,aabb.max.z }, viewProjectionMatrix), viewportMatrix);
+	CubeVertex[7] = Transform(Transform({ aabb.max.x,aabb.max.y,aabb.max.z }, viewProjectionMatrix), viewportMatrix);
+
+	//描画
+	//x軸方向
+	for (int i = 0; i <= 3; i++) {
+		Novice::DrawLine((int)CubeVertex[i].x, (int)CubeVertex[i].y, (int)CubeVertex[i + 4].x, (int)CubeVertex[i + 4].y, color);
+	}
+
+	//y軸方向
+	for (int i = 0; i <= 6; i += 2) {
+		Novice::DrawLine((int)CubeVertex[i].x, (int)CubeVertex[i].y, (int)CubeVertex[i + 1].x, (int)CubeVertex[i + 1].y, color);
+	}
+
+	//z軸方向
+	for (int i = 0; i <= 1; i++) {
+		Novice::DrawLine((int)CubeVertex[i].x, (int)CubeVertex[i].y, (int)CubeVertex[i + 2].x, (int)CubeVertex[i + 2].y, color);
+	}
+	for (int i = 4; i <= 5; i++) {
+		Novice::DrawLine((int)CubeVertex[i].x, (int)CubeVertex[i].y, (int)CubeVertex[i + 2].x, (int)CubeVertex[i + 2].y, color);
+	}
 
 }
 
