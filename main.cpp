@@ -1,7 +1,7 @@
 #include <Novice.h>
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <assert.h>
+#include <cassert>
 #include <imgui.h>
 #include <algorithm>
 #include "Vector3.h"
@@ -155,7 +155,8 @@ void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Mat
 Vector3 ClosestPoint(const AABB& aabb, const Sphere& sphere);
 //AABBと球の当たり判定
 bool isCollision(const AABB& aabb, const Sphere& sphere);
-
+//AABBと線分の当たり判定
+bool isCollision(const AABB& aabb, const Segment& segment);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -174,10 +175,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		.max{0.0f,0.0f,0.0f},
 	};
 	uint32_t color1 = 0xffffffff;
-	//球
-	Sphere sphere;
-	sphere.center = { 0.0f,0.0f,0.0f };
-	sphere.radius = 1.0f;
+	//線
+	Segment segment;
+	segment.diff = { 1.0f,1.0f,1.0f };
+	segment.origin = { 0.0f,0.0f,0.0f };
 	uint32_t color2 = 0xffffffff;
 
 
@@ -211,7 +212,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(aabb, sphere)) {
+		if (isCollision(aabb, segment)) {
 			color1 = 0xff0000ff;
 		}
 		else {
@@ -237,8 +238,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//aabb
 		DrawAABB(aabb, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//球
-		DrawSphere(sphere, worldViewProjectionMatrix, viewPortMatrix, color2);
+		//線分
+		DrawSegment(segment, worldViewProjectionMatrix, viewPortMatrix, color2);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -250,8 +251,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
 		ImGui::DragFloat3("aabb min", &aabb.min.x, 0.01f);
 		ImGui::DragFloat3("aabb max", &aabb.max.x, 0.01f);
-		ImGui::DragFloat3("sphere center", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("sphere radius", &sphere.radius, 0.01f);
+		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
+		ImGui::DragFloat3("segment origin", &segment.origin.x, 0.01f);
 		ImGui::End();
 
 		///
@@ -1133,4 +1134,105 @@ bool isCollision(const AABB& aabb, const Sphere& sphere)
 		return false;
 	}
 }
+
+bool isCollision(const AABB& aabb, const Segment& segment)
+{
+	//segmentの成分が全て0(点)の場合エラー
+	if (segment.diff.x == 0 && segment.diff.y == 0 && segment.diff.z == 0) {
+		assert("線の成分が全て0");
+	}
+
+
+	///各平面の衝突点の媒介変数
+	//x軸
+	float txmin;
+	float txmax;
+	txmin = (aabb.min.x - segment.origin.x) / segment.diff.x;
+	txmax = (aabb.max.x - segment.origin.x) / segment.diff.x;
+
+	//y軸
+	float tymin;
+	float tymax;
+	tymin = (aabb.min.y - segment.origin.y) / segment.diff.y;
+	tymax = (aabb.max.y - segment.origin.y) / segment.diff.y;
+
+	//z軸
+	float tzmin;
+	float tzmax;
+	tzmin = (aabb.min.z - segment.origin.z) / segment.diff.z;
+	tzmax = (aabb.max.z - segment.origin.z) / segment.diff.z;
+
+
+	///各衝突点を求める
+	float tNearX = min(txmin, txmax);
+	float tNearY = min(tymin, tymax);
+	float tNearZ = min(tzmin, tzmax);
+	float tFarX = max(txmin, txmax);
+	float tFarY = max(tymin, tymax);
+	float tFarZ = max(tzmin, tzmax);
+	//実際に立方体（AABB）に衝突してるかつtが小さいほう
+	float tmin = max(max(tNearX, tNearY), tNearZ);
+	//実際に立方体（AABB）に衝突してるかつtが大きいほう
+	float tmax = min(min(tFarX, tFarY), tFarZ);
+
+	//特異点の処理
+	//x成分
+	if (segment.diff.x == 0) {
+		if (segment.origin.x > aabb.min.x && segment.origin.x < aabb.max.x) {
+			//線の始点の各成分がAABB範囲内の場合
+			tmin = tNearY;
+			tmax = tFarY;
+		}
+		else if (segment.origin.x < aabb.min.x && segment.origin.x > aabb.max.x) {
+			//線の始点の各成分がAABB範囲外の場合
+			return false;
+		}
+		else if (segment.origin.x == aabb.min.x || segment.origin.x == aabb.max.x) {
+			return true;
+		}
+	}
+	//y成分
+	if (segment.diff.y == 0) {
+		if (segment.origin.y > aabb.min.y && segment.origin.y < aabb.max.y) {
+			//線の始点の各成分がAABB範囲内の場合
+			tmin = tNearZ;
+			tmax = tFarZ;
+		}
+		else if (segment.origin.y < aabb.min.y && segment.origin.y > aabb.max.y) {
+			//線の始点の各成分がAABB範囲外の場合
+			return false;
+		}
+		else if (segment.origin.x == aabb.min.x || segment.origin.x == aabb.max.x) {
+			return true;
+		}
+	}
+	//z成分
+	if (segment.diff.z == 0) {
+		if (segment.origin.z > aabb.min.z && segment.origin.z < aabb.max.z) {
+			//線の始点の各成分がAABB範囲内の場合
+			tmin = tNearX;
+			tmax = tFarX;
+		}
+		else if (segment.origin.z < aabb.min.z && segment.origin.z > aabb.max.z) {
+			//線の始点の各成分がAABB範囲外の場合
+			return false;
+		}
+		else if (segment.origin.x == aabb.min.x || segment.origin.x == aabb.max.x) {
+			return true;
+		}
+	}
+
+	//線分がAABB内にある場合の当たり判定
+
+
+	//線分の当たり判定
+	if (tmin <= tmax && tmin >= 0&& tmax <= 1) {
+		return true;
+	}
+	else {
+		return false;
+	}
+
+}
+
 
