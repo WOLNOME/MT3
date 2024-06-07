@@ -155,6 +155,16 @@ void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Mat
 Vector3 ClosestPoint(const AABB& aabb, const Sphere& sphere);
 //AABBと球の当たり判定
 bool isCollision(const AABB& aabb, const Sphere& sphere);
+//平面と直線の衝突点
+Vector3 CollisionPoint(const Line& l, const Plane& p);
+//平面と直線の衝突点
+Vector3 CollisionPoint(const Ray& r, const Plane& p);
+//平面と線分の衝突点
+Vector3 CollisionPoint(const Segment& s, const Plane& p);
+//AABBと直線の当たり判定
+bool isCollision(const AABB& aabb, const Line& line);
+//AABBと半直線の当たり判定
+bool isCollision(const AABB& aabb, const Ray& ray);
 //AABBと線分の当たり判定
 bool isCollision(const AABB& aabb, const Segment& segment);
 
@@ -1135,6 +1145,226 @@ bool isCollision(const AABB& aabb, const Sphere& sphere)
 	}
 }
 
+Vector3 CollisionPoint(const Line& l, const Plane& p)
+{
+	///衝突している前提の関数
+	Vector3 result;
+	float dot = Dot(l.diff, p.normal);
+	//媒介変数
+	float t = (p.distance - Dot(l.origin, p.normal)) / dot;
+	result = Add(l.origin, Multiply(t, l.diff));
+	return result;
+}
+
+Vector3 CollisionPoint(const Ray& r, const Plane& p)
+{
+	///衝突している前提の関数
+	Vector3 result;
+	float dot = Dot(r.diff, p.normal);
+	//媒介変数
+	float t = (p.distance - Dot(r.origin, p.normal)) / dot;
+	result = Add(r.origin, Multiply(t, r.diff));
+	return result;
+}
+
+Vector3 CollisionPoint(const Segment& s, const Plane& p)
+{
+	///衝突している前提の関数
+	Vector3 result;
+	float dot = Dot(s.diff, p.normal);
+	//媒介変数
+	float t = (p.distance - Dot(s.origin, p.normal)) / dot;
+	result = Add(s.origin, Multiply(t, s.diff));
+	return result;
+}
+
+bool isCollision(const AABB& aabb, const Line& line)
+{
+	//segmentの成分が全て0(点)の場合エラー
+	if (line.diff.x == 0 && line.diff.y == 0 && line.diff.z == 0) {
+		assert("線の成分が全て0");
+	}
+
+	//6つの平面を構造体に入れる
+	Plane pxmin;
+	Plane pxmax;
+	Plane pymin;
+	Plane pymax;
+	Plane pzmin;
+	Plane pzmax;
+	//法線の値を入力
+	pxmin.normal = { 1,0,0 };
+	pxmax.normal = { 1,0,0 };
+	pymin.normal = { 0,1,0 };
+	pymax.normal = { 0,1,0 };
+	pzmin.normal = { 0,0,1 };
+	pzmax.normal = { 0,0,1 };
+	//距離の値を入力
+	pxmin.distance = Dot(aabb.min, pxmin.normal);
+	pymin.distance = Dot(aabb.min, pymin.normal);
+	pzmin.distance = Dot(aabb.min, pzmin.normal);
+	pxmax.distance = Dot(aabb.max, pxmax.normal);
+	pymax.distance = Dot(aabb.max, pymax.normal);
+	pzmax.distance = Dot(aabb.max, pzmax.normal);
+	//それぞれの平面と線分の衝突点を求める
+	if (isCollision(line, pxmin)) {
+		Vector3 cp = CollisionPoint(line, pxmin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(line, pxmax)) {
+		Vector3 cp = CollisionPoint(line, pxmax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(line, pymin)) {
+		Vector3 cp = CollisionPoint(line, pymin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(line, pymax)) {
+		Vector3 cp = CollisionPoint(line, pymax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(line, pzmin)) {
+		Vector3 cp = CollisionPoint(line, pzmin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(line, pzmax)) {
+		Vector3 cp = CollisionPoint(line, pzmax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	//これ以上衝突条件は無い
+	return false;
+
+}
+
+bool isCollision(const AABB& aabb, const Ray& ray)
+{
+	//segmentの成分が全て0(点)の場合エラー
+	if (ray.diff.x == 0 && ray.diff.y == 0 && ray.diff.z == 0) {
+		assert("線の成分が全て0");
+	}
+
+	//6つの平面を構造体に入れる
+	Plane pxmin;
+	Plane pxmax;
+	Plane pymin;
+	Plane pymax;
+	Plane pzmin;
+	Plane pzmax;
+	//法線の値を入力
+	pxmin.normal = { 1,0,0 };
+	pxmax.normal = { 1,0,0 };
+	pymin.normal = { 0,1,0 };
+	pymax.normal = { 0,1,0 };
+	pzmin.normal = { 0,0,1 };
+	pzmax.normal = { 0,0,1 };
+	//距離の値を入力
+	pxmin.distance = Dot(aabb.min, pxmin.normal);
+	pymin.distance = Dot(aabb.min, pymin.normal);
+	pzmin.distance = Dot(aabb.min, pzmin.normal);
+	pxmax.distance = Dot(aabb.max, pxmax.normal);
+	pymax.distance = Dot(aabb.max, pymax.normal);
+	pzmax.distance = Dot(aabb.max, pzmax.normal);
+	//それぞれの平面と線分の衝突点を求める
+	if (isCollision(ray, pxmin)) {
+		Vector3 cp = CollisionPoint(ray, pxmin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(ray, pxmax)) {
+		Vector3 cp = CollisionPoint(ray, pxmax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(ray, pymin)) {
+		Vector3 cp = CollisionPoint(ray, pymin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(ray, pymax)) {
+		Vector3 cp = CollisionPoint(ray, pymax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(ray, pzmin)) {
+		Vector3 cp = CollisionPoint(ray, pzmin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(ray, pzmax)) {
+		Vector3 cp = CollisionPoint(ray, pzmax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	//これ以上衝突条件は無い
+	return false;
+}
+
 bool isCollision(const AABB& aabb, const Segment& segment)
 {
 	//segmentの成分が全て0(点)の場合エラー
@@ -1142,96 +1372,104 @@ bool isCollision(const AABB& aabb, const Segment& segment)
 		assert("線の成分が全て0");
 	}
 
-
-	///各平面の衝突点の媒介変数
-	//x軸
-	float txmin;
-	float txmax;
-	txmin = (aabb.min.x - segment.origin.x) / segment.diff.x;
-	txmax = (aabb.max.x - segment.origin.x) / segment.diff.x;
-
-	//y軸
-	float tymin;
-	float tymax;
-	tymin = (aabb.min.y - segment.origin.y) / segment.diff.y;
-	tymax = (aabb.max.y - segment.origin.y) / segment.diff.y;
-
-	//z軸
-	float tzmin;
-	float tzmax;
-	tzmin = (aabb.min.z - segment.origin.z) / segment.diff.z;
-	tzmax = (aabb.max.z - segment.origin.z) / segment.diff.z;
-
-
-	///各衝突点を求める
-	float tNearX = min(txmin, txmax);
-	float tNearY = min(tymin, tymax);
-	float tNearZ = min(tzmin, tzmax);
-	float tFarX = max(txmin, txmax);
-	float tFarY = max(tymin, tymax);
-	float tFarZ = max(tzmin, tzmax);
-	//実際に立方体（AABB）に衝突してるかつtが小さいほう
-	float tmin = max(max(tNearX, tNearY), tNearZ);
-	//実際に立方体（AABB）に衝突してるかつtが大きいほう
-	float tmax = min(min(tFarX, tFarY), tFarZ);
-
-	//特異点の処理
-	//x成分
-	if (segment.diff.x == 0) {
-		if (segment.origin.x > aabb.min.x && segment.origin.x < aabb.max.x) {
-			//線の始点の各成分がAABB範囲内の場合
-			tmin = tNearY;
-			tmax = tFarY;
-		}
-		else if (segment.origin.x < aabb.min.x && segment.origin.x > aabb.max.x) {
-			//線の始点の各成分がAABB範囲外の場合
-			return false;
-		}
-		else if (segment.origin.x == aabb.min.x || segment.origin.x == aabb.max.x) {
+	//6つの平面を構造体に入れる
+	Plane pxmin;
+	Plane pxmax;
+	Plane pymin;
+	Plane pymax;
+	Plane pzmin;
+	Plane pzmax;
+	//法線の値を入力
+	pxmin.normal = { 1,0,0 };
+	pxmax.normal = { 1,0,0 };
+	pymin.normal = { 0,1,0 };
+	pymax.normal = { 0,1,0 };
+	pzmin.normal = { 0,0,1 };
+	pzmax.normal = { 0,0,1 };
+	//距離の値を入力
+	pxmin.distance = Dot(aabb.min, pxmin.normal);
+	pymin.distance = Dot(aabb.min, pymin.normal);
+	pzmin.distance = Dot(aabb.min, pzmin.normal);
+	pxmax.distance = Dot(aabb.max, pxmax.normal);
+	pymax.distance = Dot(aabb.max, pymax.normal);
+	pzmax.distance = Dot(aabb.max, pzmax.normal);
+	//それぞれの平面と線分の衝突点を求める
+	if (isCollision(segment, pxmin)) {
+		Vector3 cp = CollisionPoint(segment, pxmin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
 			return true;
 		}
 	}
-	//y成分
-	if (segment.diff.y == 0) {
-		if (segment.origin.y > aabb.min.y && segment.origin.y < aabb.max.y) {
-			//線の始点の各成分がAABB範囲内の場合
-			tmin = tNearZ;
-			tmax = tFarZ;
-		}
-		else if (segment.origin.y < aabb.min.y && segment.origin.y > aabb.max.y) {
-			//線の始点の各成分がAABB範囲外の場合
-			return false;
-		}
-		else if (segment.origin.x == aabb.min.x || segment.origin.x == aabb.max.x) {
+	if (isCollision(segment, pxmax)) {
+		Vector3 cp = CollisionPoint(segment, pxmax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
 			return true;
 		}
 	}
-	//z成分
-	if (segment.diff.z == 0) {
-		if (segment.origin.z > aabb.min.z && segment.origin.z < aabb.max.z) {
-			//線の始点の各成分がAABB範囲内の場合
-			tmin = tNearX;
-			tmax = tFarX;
-		}
-		else if (segment.origin.z < aabb.min.z && segment.origin.z > aabb.max.z) {
-			//線の始点の各成分がAABB範囲外の場合
-			return false;
-		}
-		else if (segment.origin.x == aabb.min.x || segment.origin.x == aabb.max.x) {
+	if (isCollision(segment, pymin)) {
+		Vector3 cp = CollisionPoint(segment, pymin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
 			return true;
 		}
 	}
-
-	//線分がAABB内にある場合の当たり判定
-
-
-	//線分の当たり判定
-	if (tmin <= tmax && tmin >= 0&& tmax <= 1) {
+	if (isCollision(segment, pymax)) {
+		Vector3 cp = CollisionPoint(segment, pymax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(segment, pzmin)) {
+		Vector3 cp = CollisionPoint(segment, pzmin);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	if (isCollision(segment, pzmax)) {
+		Vector3 cp = CollisionPoint(segment, pzmax);
+		if (
+			cp.x >= aabb.min.x && cp.x <= aabb.max.x &&
+			cp.y >= aabb.min.y && cp.y <= aabb.max.y &&
+			cp.z >= aabb.min.z && cp.z <= aabb.max.z
+			) {
+			return true;
+		}
+	}
+	//線分がaabb内にある場合→始点と終点がそれぞれmin max内
+	Vector3 ep = Add(segment.origin, segment.diff);
+	if (
+		segment.origin.x >= aabb.min.x && segment.origin.x <= aabb.max.x &&
+		segment.origin.y >= aabb.min.y && segment.origin.y <= aabb.max.y &&
+		segment.origin.z >= aabb.min.z && segment.origin.z <= aabb.max.z &&
+		ep.x >= aabb.min.x && ep.x <= aabb.max.x &&
+		ep.y >= aabb.min.y && ep.y <= aabb.max.y &&
+		ep.z >= aabb.min.z && ep.z <= aabb.max.z
+		) {
 		return true;
 	}
-	else {
-		return false;
-	}
+
+	//これ以上衝突条件は無い
+	return false;
+
 
 }
 
