@@ -49,6 +49,12 @@ struct AABB {
 	Vector3 min;
 	Vector3 max;
 };
+//OBB
+struct OBB {
+	Vector3 center;
+	Vector3 orientations[3];
+	Vector3 size;
+};
 
 
 
@@ -167,6 +173,10 @@ bool isCollision(const AABB& aabb, const Line& line);
 bool isCollision(const AABB& aabb, const Ray& ray);
 //AABBと線分の当たり判定
 bool isCollision(const AABB& aabb, const Segment& segment);
+//OBBと球の衝突判定
+bool isCollision(OBB& obb,const Vector3& ratate, const Sphere& sphere);
+//OBBの描画
+void DrawOBB(const OBB& obb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -179,26 +189,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	//aabb
-	AABB aabb{
-		.min{-0.5f,-0.5f,-0.5f},
-		.max{0.0f,0.0f,0.0f},
+	Vector3 rotate{ 0.0f,0.0f,0.0f };
+	//obb
+	OBB obb{
+		.center{-1.0f,0.0f,0.0f},
+		.orientations = {{1.0f,0.0f,0.0f},
+						 {0.0f,1.0f,0.0f},
+						 {0.0f,0.0f,1.0f}},
+		.size{0.5f,0.5f,0.5f}
 	};
-	uint32_t color1 = 0xffffffff;
-	//線
-	Segment segment;
-	segment.diff = { 1.0f,1.0f,1.0f };
-	segment.origin = { 0.0f,0.0f,0.0f };
-	uint32_t color2 = 0xffffffff;
 
-
-	aabb.min.x = (std::min)(aabb.min.x, aabb.max.x);
-	aabb.max.x = (std::max)(aabb.min.x, aabb.max.x);
-	aabb.min.y = (std::min)(aabb.min.y, aabb.max.y);
-	aabb.max.y = (std::max)(aabb.min.y, aabb.max.y);
-	aabb.min.z = (std::min)(aabb.min.z, aabb.max.z);
-	aabb.max.z = (std::max)(aabb.min.z, aabb.max.z);
-
+	//球
+	Sphere sphere{
+		.center{0.0f,0.0f,0.0f},
+		.radius{0.5f}
+	};
 
 	//カメラの座標と角度
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
@@ -222,12 +227,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(aabb, segment)) {
-			color1 = 0xff0000ff;
-		}
-		else {
-			color1 = 0xffffffff;
-		}
+
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -246,10 +246,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//aabb
-		DrawAABB(aabb, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//線分
-		DrawSegment(segment, worldViewProjectionMatrix, viewPortMatrix, color2);
+		
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -259,10 +256,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("aabb min", &aabb.min.x, 0.01f);
-		ImGui::DragFloat3("aabb max", &aabb.max.x, 0.01f);
-		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
-		ImGui::DragFloat3("segment origin", &segment.origin.x, 0.01f);
+
 		ImGui::End();
 
 		///
@@ -1469,6 +1463,76 @@ bool isCollision(const AABB& aabb, const Segment& segment)
 
 	//これ以上衝突条件は無い
 	return false;
+
+
+}
+
+bool isCollision(OBB& obb, const Vector3& ratate, const Sphere& sphere)
+{
+	//obbのワールドマトリックスを作る
+	Matrix4x4 obbWorldMatrix = MakeIdentity4x4();
+
+	//回転行列を生成
+	Matrix4x4 rotateMatrix = Multiply(MakeRotateXMatrix(rotate.x), Multiply(MakeRotateYMatrix(rotate.y), MakeRotateZMatrix(rotate.z)));
+	//回転行列から軸を抽出
+	obb.orientations[0].x = rotateMatrix
+
+		//obbのワールドマトリックスを作る
+		Matrix4x4 obbWorldMatrix = MakeIdentity4x4();
+	
+	//回転成分を与える
+	obbWorldMatrix.m[0][0] = obb.orientations[0].x;
+	obbWorldMatrix.m[0][1] = obb.orientations[1].x;
+	obbWorldMatrix.m[0][2] = obb.orientations[2].x;
+	obbWorldMatrix.m[1][0] = obb.orientations[0].y;
+	obbWorldMatrix.m[1][1] = obb.orientations[1].y;
+	obbWorldMatrix.m[1][2] = obb.orientations[2].y;
+	obbWorldMatrix.m[2][0] = obb.orientations[0].z;
+	obbWorldMatrix.m[2][1] = obb.orientations[1].z;
+	obbWorldMatrix.m[2][2] = obb.orientations[2].z;
+	//平行移動成分を与える
+	obbWorldMatrix.m[3][0] = obb.center.x;
+	obbWorldMatrix.m[3][1] = obb.center.y;
+	obbWorldMatrix.m[3][2] = obb.center.z;
+	//OBBのローカル空間座標を取得
+	Vector3 centerInOBBLocalSpace = Transform(sphere.center, Inverse(obbWorldMatrix));
+	//OBBを基にAABBを作成
+	AABB aabbOBBLocal{ .min = Multiply(-1.0f,obb.size),.max = obb.size };
+	//球体もOBBのローカル空間で作る
+	Sphere sphereOBBLocal{ centerInOBBLocalSpace,sphere.radius };
+	//ローカル空間で当たり判定
+	if (isCollision(aabbOBBLocal, sphereOBBLocal)) {
+		return true;
+	}
+	else {
+		return false;
+	}
+
+}
+
+void DrawOBB(OBB& obb,const Vector3& rotate, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	//回転行列を生成
+	Matrix4x4 rotateMatrix = Multiply(MakeRotateXMatrix(rotate.x), Multiply(MakeRotateYMatrix(rotate.y), MakeRotateZMatrix(rotate.z)));
+	//回転行列から軸を抽出
+	obb.orientations[0].x=rotateMatrix
+
+	//obbのワールドマトリックスを作る
+	Matrix4x4 obbWorldMatrix = MakeIdentity4x4();
+	//回転成分を与える
+	obbWorldMatrix.m[0][0] = obb.orientations[0].x;
+	obbWorldMatrix.m[0][1] = obb.orientations[1].x;
+	obbWorldMatrix.m[0][2] = obb.orientations[2].x;
+	obbWorldMatrix.m[1][0] = obb.orientations[0].y;
+	obbWorldMatrix.m[1][1] = obb.orientations[1].y;
+	obbWorldMatrix.m[1][2] = obb.orientations[2].y;
+	obbWorldMatrix.m[2][0] = obb.orientations[0].z;
+	obbWorldMatrix.m[2][1] = obb.orientations[1].z;
+	obbWorldMatrix.m[2][2] = obb.orientations[2].z;
+	//平行移動成分を与える
+	obbWorldMatrix.m[3][0] = obb.center.x;
+	obbWorldMatrix.m[3][1] = obb.center.y;
+	obbWorldMatrix.m[3][2] = obb.center.z;
 
 
 }
