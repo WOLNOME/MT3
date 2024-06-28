@@ -167,6 +167,10 @@ bool isCollision(const AABB& aabb, const Line& line);
 bool isCollision(const AABB& aabb, const Ray& ray);
 //AABBと線分の当たり判定
 bool isCollision(const AABB& aabb, const Segment& segment);
+//線形補完
+Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
+//ベジェ曲線の描画処理
+void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPoint2, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -179,26 +183,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	//aabb
-	AABB aabb{
-		.min{-0.5f,-0.5f,-0.5f},
-		.max{0.0f,0.0f,0.0f},
+	Vector3 contorolPoints[3] = {
+		{-0.0f,0.50f,1.0f},
+		{1.76f,1.0f,-0.3f},
+		{0.94f,-0.7f,2.3f}
 	};
-	uint32_t color1 = 0xffffffff;
-	//線
-	Segment segment;
-	segment.diff = { 1.0f,1.0f,1.0f };
-	segment.origin = { 0.0f,0.0f,0.0f };
-	uint32_t color2 = 0xffffffff;
-
-
-	aabb.min.x = (std::min)(aabb.min.x, aabb.max.x);
-	aabb.max.x = (std::max)(aabb.min.x, aabb.max.x);
-	aabb.min.y = (std::min)(aabb.min.y, aabb.max.y);
-	aabb.max.y = (std::max)(aabb.min.y, aabb.max.y);
-	aabb.min.z = (std::min)(aabb.min.z, aabb.max.z);
-	aabb.max.z = (std::max)(aabb.min.z, aabb.max.z);
-
+	uint32_t color = 0x0000ffff;
 
 	//カメラの座標と角度
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
@@ -222,12 +212,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//カメラの移動
 
 		//当たり判定処理
-		if (isCollision(aabb, segment)) {
-			color1 = 0xff0000ff;
-		}
-		else {
-			color1 = 0xffffffff;
-		}
+		
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -246,10 +231,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//aabb
-		DrawAABB(aabb, worldViewProjectionMatrix, viewPortMatrix, color1);
-		//線分
-		DrawSegment(segment, worldViewProjectionMatrix, viewPortMatrix, color2);
+		//ベジェ曲線
+		DrawBezier(contorolPoints[0], contorolPoints[1], contorolPoints[2], worldViewProjectionMatrix, viewPortMatrix, color);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -259,10 +242,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("aabb min", &aabb.min.x, 0.01f);
-		ImGui::DragFloat3("aabb max", &aabb.max.x, 0.01f);
-		ImGui::DragFloat3("segment diff", &segment.diff.x, 0.01f);
-		ImGui::DragFloat3("segment origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("contorolPoints0", &contorolPoints[0].x, 0.01f);
+		ImGui::DragFloat3("contorolPoints1", &contorolPoints[1].x, 0.01f);
+		ImGui::DragFloat3("contorolPoints2", &contorolPoints[2].x, 0.01f);
 		ImGui::End();
 
 		///
@@ -1471,6 +1453,55 @@ bool isCollision(const AABB& aabb, const Segment& segment)
 	return false;
 
 
+}
+
+Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t)
+{
+	Vector3 result;
+	result = Add(v1, Multiply(t, Subtract(v2, v1)));
+	return result;
+}
+
+void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPoint2, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	//分割数
+	const int index = 20;
+	for (int i = 0; i <= index; i++) {
+		///点
+		float t = i / (float)index;
+		//制御点p0,p1を線形補完
+		Vector3 p0p1 = Lerp(controlPoint0, controlPoint1, t);
+		//制御点p1,p2を線形補完
+		Vector3 p1p2 = Lerp(controlPoint1, controlPoint2, t);
+		//制御点p0p1,p1p2を線形補完
+		Vector3 p = Lerp(p0p1, p1p2, t);
+		//スクリーン座標変換
+		Vector3 ps = Transform(Transform(p, viewProjectionMatrix), viewportMatrix);
+		///前の点
+		float t_ = (i - 1) / (float)index;
+		//制御点p0,p1を線形補完
+		Vector3 p0p1_ = Lerp(controlPoint0, controlPoint1, t_);
+		//制御点p1,p2を線形補完
+		Vector3 p1p2_ = Lerp(controlPoint1, controlPoint2, t_);
+		//制御点p0p1,p1p2を線形補完
+		Vector3 p_ = Lerp(p0p1_, p1p2_, t_);
+		//スクリーン座標変換
+		Vector3 ps_ = Transform(Transform(p_, viewProjectionMatrix), viewportMatrix);
+		if (i > 0) {
+			Novice::DrawLine((int)ps_.x, (int)ps_.y, (int)ps.x, (int)ps.y, color);
+		}
+	}
+	//contorolPointsの描画
+		Sphere sphere[3];
+		sphere[0].center = controlPoint0;
+		sphere[1].center = controlPoint1;
+		sphere[2].center = controlPoint2;
+		sphere[0].radius = 0.01f;
+		sphere[1].radius = 0.01f;
+		sphere[2].radius = 0.01f;
+		for (int i = 0; i < 3; i++) {
+			DrawSphere(sphere[i], viewProjectionMatrix, viewportMatrix, 0x000000ff);
+		}
 }
 
 
