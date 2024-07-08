@@ -174,6 +174,22 @@ void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, cons
 //線の描画処理
 void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix, uint32_t color);
 
+/////////////オーバーロード///////////////
+//二項演算子
+Vector3 operator+(const Vector3& v1, const Vector3& v2) { return Add(v1, v2); }
+Vector3 operator-(const Vector3& v1, const Vector3& v2) { return Subtract(v1, v2); }
+Vector3 operator*(float s, const Vector3& v) { return Multiply(s, v); }
+Vector3 operator*(const Vector3& v, float s) { return s * v; }
+Vector3 operator/(const Vector3& v, float s) { return Multiply(1.0f / s, v); }
+Matrix4x4 operator+(const Matrix4x4& m1, const Matrix4x4& m2) { return Add(m1, m2); }
+Matrix4x4 operator-(const Matrix4x4& m1, const Matrix4x4& m2) { return Subtract(m1, m2); }
+Matrix4x4 operator*(const Matrix4x4& m1, const Matrix4x4& m2) { return Multiply(m1, m2); }
+//単項演算子
+Vector3 operator-(const Vector3& v) { return { -v.x,-v.y,-v.z }; }
+Vector3 operator+(const Vector3& v) { return v; }
+
+
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -184,35 +200,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	//初期化
-	Vector3 translates[3] = {
-		{0.2f,1.0f,0.0f},
-		{0.4f,0.0f,0.0f},
-		{0.3f,0.0f,0.0f}
-	};
+	Vector3 a{ 0.2f,1.0f,0.0f };
+	Vector3 b{ 2.4f,3.1f,1.2f };
+	Vector3 c = a + b;
+	Vector3 d = a - b;
+	Vector3 e = a * 2.4f;
+	Vector3 rotate{ 0.4f,1.43f,-0.8f };
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
 
-	Vector3 rotates[3] = {
-		{0.0f,0.0f,-6.0f},
-		{0.0f,0.0f,-1.4f},
-		{0.0f,0.0f,0.0f}
-	};
-
-	Vector3 scales[3] = {
-		{1.0f,1.0f,1.0f},
-		{1.0f,1.0f,1.0f},
-		{1.0f,1.0f,1.0f}
-	};
-
-	//描画用球体
-	Sphere spheres[3];
-	for (int i = 0; i < 3; i++) {
-		spheres[i].radius = 0.1f;
-	}
-	//色
-	uint32_t colors[3];
-	colors[0] = 0xff0000ff;
-	colors[1] = 0x00ff00ff;
-	colors[2] = 0x0000ffff;
 
 	//カメラの座標と角度
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
@@ -233,19 +231,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		//各ノードのLocalMatrixを求める
-		Matrix4x4 Ls = MakeAffineMatrix(scales[0], rotates[0], translates[0]);
-		Matrix4x4 Le = MakeAffineMatrix(scales[1], rotates[1], translates[1]);
-		Matrix4x4 Lh = MakeAffineMatrix(scales[2], rotates[2], translates[2]);
-		//各ノードのWorldMatrixを求める
-		Matrix4x4 Ws = Ls;
-		Matrix4x4 We = Multiply(Le, Ls);
-		Matrix4x4 Wh = Multiply(Lh, We);
-		//球体情報の入力
-		spheres[0].center = { Ws.m[3][0],Ws.m[3][1] ,Ws.m[3][2] };
-		spheres[1].center = { We.m[3][0],We.m[3][1] ,We.m[3][2] };
-		spheres[2].center = { Wh.m[3][0],Wh.m[3][1] ,Wh.m[3][2] };
-
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -264,14 +249,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//球体
-		for (int i = 0; i < 3; i++) {
-			DrawSphere(spheres[i], worldViewProjectionMatrix, viewPortMatrix, colors[i]);
-		}
-		//球体を結ぶ線
-		DrawLine({Ws.m[3][0],Ws.m[3][1],Ws.m[3][2] }, { We.m[3][0],We.m[3][1],We.m[3][2] }, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
-		DrawLine({ We.m[3][0],We.m[3][1],We.m[3][2] }, { Wh.m[3][0],Wh.m[3][1],Wh.m[3][2] }, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
-
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -281,15 +258,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("translates[0]", &translates[0].x, 0.01f);
-		ImGui::DragFloat3("rotates[0]", &rotates[0].x, 0.01f);
-		ImGui::DragFloat3("scales[0]", &scales[0].x, 0.01f);
-		ImGui::DragFloat3("translates[1]", &translates[1].x, 0.01f);
-		ImGui::DragFloat3("rotates[1]", &rotates[1].x, 0.01f);
-		ImGui::DragFloat3("scales[1]", &scales[1].x, 0.01f);
-		ImGui::DragFloat3("translates[2]", &translates[2].x, 0.01f);
-		ImGui::DragFloat3("rotates[2]", &rotates[2].x, 0.01f);
-		ImGui::DragFloat3("scales[2]", &scales[2].x, 0.01f);
+		ImGui::End();
+
+		ImGui::Begin("Window2");
+		ImGui::Text("c:%f,%f,%f", c.x, c.y, c.z);
+		ImGui::Text("d:%f,%f,%f", d.x, d.y, d.z);
+		ImGui::Text("e:%f,%f,%f", e.x, e.y, e.z);
+		ImGui::Text(
+			"matrix:\n%f,%f,%f,%f\n%f,%f,%f,%f\n%f,%f,%f,%f\n%f,%f,%f,%f\n",
+			rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2], rotateMatrix.m[0][3],
+			rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
+			rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
+			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
+		);
+
 		ImGui::End();
 
 		///
@@ -640,7 +622,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
 	Matrix4x4 rx = MakeRotateXMatrix(rotate.x);
 	Matrix4x4 ry = MakeRotateYMatrix(rotate.y);
 	Matrix4x4 rz = MakeRotateZMatrix(rotate.z);
-	Matrix4x4 rxyz = Multiply( Multiply(rx, ry),rz);
+	Matrix4x4 rxyz = Multiply(Multiply(rx, ry), rz);
 
 	c.m[0][0] = scale.x * rxyz.m[0][0];
 	c.m[0][1] = scale.x * rxyz.m[0][1];
