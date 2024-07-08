@@ -171,6 +171,8 @@ bool isCollision(const AABB& aabb, const Segment& segment);
 Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
 //ベジェ曲線の描画処理
 void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPoint2, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
+//線の描画処理
+void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -183,12 +185,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char preKeys[256] = { 0 };
 
 	//初期化
-	Vector3 contorolPoints[3] = {
-		{-0.0f,0.50f,1.0f},
-		{1.76f,1.0f,-0.3f},
-		{0.94f,-0.7f,2.3f}
+	Vector3 translates[3] = {
+		{0.2f,1.0f,0.0f},
+		{0.4f,0.0f,0.0f},
+		{0.3f,0.0f,0.0f}
 	};
-	uint32_t color = 0x0000ffff;
+
+	Vector3 rotates[3] = {
+		{0.0f,0.0f,-6.0f},
+		{0.0f,0.0f,-1.4f},
+		{0.0f,0.0f,0.0f}
+	};
+
+	Vector3 scales[3] = {
+		{1.0f,1.0f,1.0f},
+		{1.0f,1.0f,1.0f},
+		{1.0f,1.0f,1.0f}
+	};
+
+	//描画用球体
+	Sphere spheres[3];
+	for (int i = 0; i < 3; i++) {
+		spheres[i].radius = 0.1f;
+	}
+	//色
+	uint32_t colors[3];
+	colors[0] = 0xff0000ff;
+	colors[1] = 0x00ff00ff;
+	colors[2] = 0x0000ffff;
 
 	//カメラの座標と角度
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
@@ -209,10 +233,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		//カメラの移動
+		//各ノードのLocalMatrixを求める
+		Matrix4x4 Ls = MakeAffineMatrix(scales[0], rotates[0], translates[0]);
+		Matrix4x4 Le = MakeAffineMatrix(scales[1], rotates[1], translates[1]);
+		Matrix4x4 Lh = MakeAffineMatrix(scales[2], rotates[2], translates[2]);
+		//各ノードのWorldMatrixを求める
+		Matrix4x4 Ws = Ls;
+		Matrix4x4 We = Multiply(Le, Ls);
+		Matrix4x4 Wh = Multiply(Lh, We);
+		//球体情報の入力
+		spheres[0].center = { Ws.m[3][0],Ws.m[3][1] ,Ws.m[3][2] };
+		spheres[1].center = { We.m[3][0],We.m[3][1] ,We.m[3][2] };
+		spheres[2].center = { Wh.m[3][0],Wh.m[3][1] ,Wh.m[3][2] };
 
-		//当たり判定処理
-		
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -231,8 +264,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		//ベジェ曲線
-		DrawBezier(contorolPoints[0], contorolPoints[1], contorolPoints[2], worldViewProjectionMatrix, viewPortMatrix, color);
+		//球体
+		for (int i = 0; i < 3; i++) {
+			DrawSphere(spheres[i], worldViewProjectionMatrix, viewPortMatrix, colors[i]);
+		}
+		//球体を結ぶ線
+		DrawLine({Ws.m[3][0],Ws.m[3][1],Ws.m[3][2] }, { We.m[3][0],We.m[3][1],We.m[3][2] }, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+		DrawLine({ We.m[3][0],We.m[3][1],We.m[3][2] }, { Wh.m[3][0],Wh.m[3][1],Wh.m[3][2] }, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -242,9 +281,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("contorolPoints0", &contorolPoints[0].x, 0.01f);
-		ImGui::DragFloat3("contorolPoints1", &contorolPoints[1].x, 0.01f);
-		ImGui::DragFloat3("contorolPoints2", &contorolPoints[2].x, 0.01f);
+		ImGui::DragFloat3("translates[0]", &translates[0].x, 0.01f);
+		ImGui::DragFloat3("rotates[0]", &rotates[0].x, 0.01f);
+		ImGui::DragFloat3("scales[0]", &scales[0].x, 0.01f);
+		ImGui::DragFloat3("translates[1]", &translates[1].x, 0.01f);
+		ImGui::DragFloat3("rotates[1]", &rotates[1].x, 0.01f);
+		ImGui::DragFloat3("scales[1]", &scales[1].x, 0.01f);
+		ImGui::DragFloat3("translates[2]", &translates[2].x, 0.01f);
+		ImGui::DragFloat3("rotates[2]", &rotates[2].x, 0.01f);
+		ImGui::DragFloat3("scales[2]", &scales[2].x, 0.01f);
 		ImGui::End();
 
 		///
@@ -595,7 +640,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
 	Matrix4x4 rx = MakeRotateXMatrix(rotate.x);
 	Matrix4x4 ry = MakeRotateYMatrix(rotate.y);
 	Matrix4x4 rz = MakeRotateZMatrix(rotate.z);
-	Matrix4x4 rxyz = Multiply(rx, Multiply(ry, rz));
+	Matrix4x4 rxyz = Multiply( Multiply(rx, ry),rz);
 
 	c.m[0][0] = scale.x * rxyz.m[0][0];
 	c.m[0][1] = scale.x * rxyz.m[0][1];
@@ -1492,16 +1537,30 @@ void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, cons
 		}
 	}
 	//contorolPointsの描画
-		Sphere sphere[3];
-		sphere[0].center = controlPoint0;
-		sphere[1].center = controlPoint1;
-		sphere[2].center = controlPoint2;
-		sphere[0].radius = 0.01f;
-		sphere[1].radius = 0.01f;
-		sphere[2].radius = 0.01f;
-		for (int i = 0; i < 3; i++) {
-			DrawSphere(sphere[i], viewProjectionMatrix, viewportMatrix, 0x000000ff);
-		}
+	Sphere sphere[3];
+	sphere[0].center = controlPoint0;
+	sphere[1].center = controlPoint1;
+	sphere[2].center = controlPoint2;
+	sphere[0].radius = 0.01f;
+	sphere[1].radius = 0.01f;
+	sphere[2].radius = 0.01f;
+	for (int i = 0; i < 3; i++) {
+		DrawSphere(sphere[i], viewProjectionMatrix, viewportMatrix, 0x000000ff);
+	}
+}
+
+void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix, uint32_t color)
+{
+	//ワールド座標系→スクリーン座標系に変換する
+	Vector3 ndcVerticies[2];
+	Vector3 screenVerticies[2];
+	ndcVerticies[0] = Transform(worldStartPoint, viewProjectionMatrix);
+	ndcVerticies[1] = Transform(worldEndPoint, viewProjectionMatrix);
+	screenVerticies[0] = Transform(ndcVerticies[0], viewPortMatrix);
+	screenVerticies[1] = Transform(ndcVerticies[1], viewPortMatrix);
+
+	//スクリーン座標で描画
+	Novice::DrawLine((int)screenVerticies[0].x, (int)screenVerticies[0].y, (int)screenVerticies[1].x, (int)screenVerticies[1].y, color);
 }
 
 
