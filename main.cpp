@@ -219,18 +219,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	Spring spring{};
-	spring.anchor = { 0.0f,0.0f,0.0f };
-	spring.naturalLength = 1.0f;
-	spring.stiffness = 100.0f;
-	spring.dampingCoefficient = 2.0f;
+	//角速度
+	float angularVelocity = (float)M_PI;
+	//角度
+	float angle = 0.0f;
+	//回転中心
+	Vector3 c = { 0.0f,0.0f,0.0f };
+	//回転半径
+	float r = 0.8f;
+	//回転する球体
+	Sphere sphere{};
+	sphere.radius = 0.1f;
+	sphere.center.x = c.x + std::cos(angle) * r;
+	sphere.center.y = c.y + std::sin(angle) * r;
+	sphere.center.z = c.z;
 
-	Ball ball{};
-	ball.position = { 1.2f,0.0f,0.0f };
-	ball.mass = 2.0f;
-	ball.radius = 0.05f;
-	ball.color = BLUE;
+	//スタートボタン
+	bool isStart = false;
 
+
+	//デルタタイム
 	float deltaTime = 1.0f / 60.0f;
 
 	//カメラの座標と角度
@@ -254,21 +262,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 		/// ↓更新処理ここから
 		///
-		Vector3 diff = ball.position - spring.anchor;
-		float length = Length(diff);
-		if (length != 0.0f) {
-			Vector3 direction = Normalize(diff);
-			Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
-			Vector3 displacement = length * (ball.position - restPosition);
-			Vector3 restoringForce = -spring.stiffness * displacement;
-			//減衰抵抗を計算する
-			Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
-			Vector3 force = restoringForce + dampingForce;
-			ball.acceleration = force / ball.mass;
+
+		if (isStart) {
+			//角度の更新
+			angle += angularVelocity * deltaTime;
+			//球体座標の更新
+			sphere.center.x = c.x + std::cos(angle) * r;
+			sphere.center.y = c.y + std::sin(angle) * r;
+			sphere.center.z = c.z;
 		}
-		//加速度、速度ともに秒を基準としている
-		ball.velocity += ball.acceleration * deltaTime;
-		ball.position += ball.velocity * deltaTime;
+
 
 
 
@@ -289,11 +292,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
+		//球
+		DrawSphere(sphere, worldViewProjectionMatrix, viewPortMatrix,0xffffffff);
 
-		//ボール
-		DrawBall(ball, worldViewProjectionMatrix, viewPortMatrix);
-		//バネ
-		DrawLine(spring.anchor, ball.position, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
 
@@ -302,6 +303,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
+		if (ImGui::Button("Start")) {
+			isStart = true;
+		}
 		ImGui::End();
 
 		///
