@@ -65,7 +65,14 @@ struct Ball {
 	float radius;
 	unsigned int color;
 };
-
+//振り子
+struct Pendulum {
+	Vector3 anchor;
+	float length;
+	float angle;
+	float angularVelocity;
+	float angularAcceleration;
+};
 
 
 //関数
@@ -219,24 +226,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	//角速度
-	float angularVelocity = (float)M_PI;
-	//角度
-	float angle = 0.0f;
-	//回転中心
-	Vector3 c = { 0.0f,0.0f,0.0f };
-	//回転半径
-	float r = 0.8f;
-	//回転する球体
+	Pendulum pendulum{};
+	pendulum.anchor = { 0.0f,1.0f,0.0f };
+	pendulum.length = 0.8f;
+	pendulum.angle = 0.7f;
+	pendulum.angularVelocity = 0.0f;
+	pendulum.angularAcceleration = 0.0f;
+
+	//振り子先端に取り付ける球体
 	Sphere sphere{};
-	sphere.radius = 0.1f;
-	sphere.center.x = c.x + std::cos(angle) * r;
-	sphere.center.y = c.y + std::sin(angle) * r;
-	sphere.center.z = c.z;
+	sphere.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
+	sphere.center.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
+	sphere.center.z = pendulum.anchor.z;
+	sphere.radius = 0.05f;
 
 	//スタートボタン
 	bool isStart = false;
-
 
 	//デルタタイム
 	float deltaTime = 1.0f / 60.0f;
@@ -264,16 +269,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		if (isStart) {
-			//角度の更新
-			angle += angularVelocity * deltaTime;
-			//球体座標の更新
-			sphere.center.x = c.x + std::cos(angle) * r;
-			sphere.center.y = c.y + std::sin(angle) * r;
-			sphere.center.z = c.z;
+			pendulum.angularAcceleration = -(9.8f / pendulum.length) * std::sin(pendulum.angle);
+			pendulum.angularVelocity += pendulum.angularAcceleration * deltaTime;
+			pendulum.angle += pendulum.angularVelocity * deltaTime;
+
+			//先端の更新
+			sphere.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
+			sphere.center.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
+			sphere.center.z = pendulum.anchor.z;
 		}
-
-
-
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -292,8 +296,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
+
 		//球
-		DrawSphere(sphere, worldViewProjectionMatrix, viewPortMatrix,0xffffffff);
+		DrawSphere(sphere, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+		//ひも
+		DrawLine(pendulum.anchor, sphere.center, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -303,7 +310,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		if (ImGui::Button("Start")) {
+		if (ImGui::Button("start")) {
 			isStart = true;
 		}
 		ImGui::End();
