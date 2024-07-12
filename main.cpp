@@ -49,6 +49,22 @@ struct AABB {
 	Vector3 min;
 	Vector3 max;
 };
+//ばね
+struct Spring {
+	Vector3 anchor;
+	float naturalLength;
+	float stiffness;
+	float dampingCoefficient;
+};
+//ボール(物理)
+struct Ball {
+	Vector3 position;
+	Vector3 velocity;
+	Vector3 acceleration;
+	float mass;
+	float radius;
+	unsigned int color;
+};
 
 
 
@@ -173,6 +189,9 @@ Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
 void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPoint2, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 //線の描画処理
 void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix, uint32_t color);
+//ボールの描画
+void DrawBall(const Ball& ball, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix);
+
 
 /////////////オーバーロード///////////////
 //二項演算子
@@ -187,7 +206,7 @@ Matrix4x4 operator*(const Matrix4x4& m1, const Matrix4x4& m2) { return Multiply(
 //単項演算子
 Vector3 operator-(const Vector3& v) { return { -v.x,-v.y,-v.z }; }
 Vector3 operator+(const Vector3& v) { return v; }
-
+//複合代入演算子→各構造体定義ヘッダーに入っている
 
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -200,22 +219,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	Vector3 a{ 0.2f,1.0f,0.0f };
-	Vector3 b{ 2.4f,3.1f,1.2f };
-	Vector3 c = a + b;
-	Vector3 d = a - b;
-	Vector3 e = a * 2.4f;
-	Vector3 rotate{ 0.4f,1.43f,-0.8f };
-	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
-	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
-	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
-	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
+	Spring spring{};
+	spring.anchor = { 0.0f,0.0f,0.0f };
+	spring.naturalLength = 1.0f;
+	spring.stiffness = 100.0f;
+	spring.dampingCoefficient = 2.0f;
 
+	Ball ball{};
+	ball.position = { 1.2f,0.0f,0.0f };
+	ball.mass = 2.0f;
+	ball.radius = 0.05f;
+	ball.color = BLUE;
+
+	float deltaTime = 1.0f / 60.0f;
 
 	//カメラの座標と角度
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate = { 0.26f,0.0f,0.0f };
 
+	Vector3 a = { 1.0f,2.0f,3.0f };
+	float b = 4.0f;
+	a *= b;
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -230,6 +254,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 		/// ↓更新処理ここから
 		///
+		Vector3 diff = ball.position - spring.anchor;
+		float length = Length(diff);
+		if (length != 0.0f) {
+			Vector3 direction = Normalize(diff);
+			Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
+			Vector3 displacement = length * (ball.position - restPosition);
+			Vector3 restoringForce = -spring.stiffness * displacement;
+			//減衰抵抗を計算する
+			Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
+			Vector3 force = restoringForce + dampingForce;
+			ball.acceleration = force / ball.mass;
+		}
+		//加速度、速度ともに秒を基準としている
+		ball.velocity += ball.acceleration * deltaTime;
+		ball.position += ball.velocity * deltaTime;
+
 
 
 		//各種行列の計算
@@ -250,6 +290,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 
+		//ボール
+		DrawBall(ball, worldViewProjectionMatrix, viewPortMatrix);
+		//バネ
+		DrawLine(spring.anchor, ball.position, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
 
@@ -258,20 +302,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::End();
-
-		ImGui::Begin("Window2");
-		ImGui::Text("c:%f,%f,%f", c.x, c.y, c.z);
-		ImGui::Text("d:%f,%f,%f", d.x, d.y, d.z);
-		ImGui::Text("e:%f,%f,%f", e.x, e.y, e.z);
-		ImGui::Text(
-			"matrix:\n%f,%f,%f,%f\n%f,%f,%f,%f\n%f,%f,%f,%f\n%f,%f,%f,%f\n",
-			rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2], rotateMatrix.m[0][3],
-			rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
-			rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
-			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
-		);
-
 		ImGui::End();
 
 		///
@@ -1543,6 +1573,17 @@ void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, cons
 
 	//スクリーン座標で描画
 	Novice::DrawLine((int)screenVerticies[0].x, (int)screenVerticies[0].y, (int)screenVerticies[1].x, (int)screenVerticies[1].y, color);
+}
+
+void DrawBall(const Ball& ball, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
+{
+	//球に変換
+	Sphere sphere;
+	sphere.center = ball.position;
+	sphere.radius = ball.radius;
+	uint32_t color = ball.color;
+	//球の描画
+	DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, color);
 }
 
 
