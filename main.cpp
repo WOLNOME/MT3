@@ -7,7 +7,7 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
-const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_2-4_確認課題";
+const char kWindowTitle[] = "LE2A_02_ウシオユウキ_MT3_確認課題";
 
 //定数
 const int  kWindowWidth = 1280;
