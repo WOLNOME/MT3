@@ -81,6 +81,11 @@ struct ConicalPendulum {
 	float angle;
 	float angularVelocity;
 };
+//トンネリング対策(カプセル)
+struct Capsule{
+	Segment segment;
+	float radius;
+};
 
 
 //関数
@@ -206,6 +211,8 @@ void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, cons
 void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix, uint32_t color);
 //ボールの描画
 void DrawBall(const Ball& ball, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix);
+//反射ベクトルを求める関数
+Vector3 Reflect(const Vector3& input, const Vector3& normal);
 
 
 /////////////オーバーロード///////////////
@@ -234,22 +241,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	ConicalPendulum conicalPendulum;
-	conicalPendulum.anchor = { 0.0f,1.0f,0.0f };
-	conicalPendulum.length = 0.8f;
-	conicalPendulum.halfApexAngle = 0.7f;
-	conicalPendulum.angle = 0.0f;
-	conicalPendulum.angularVelocity = 0.0f;
+	//平面
+	Plane plane;
+	plane.normal = Normalize({ -0.2f,0.9f,-0.3f });
+	plane.distance = 0.0f;
 
-	//振り子先端に取り付ける球体
-	Ball bob{};
-	float radius = std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-	float height = std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-	bob.position.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
-	bob.position.y = conicalPendulum.anchor.y - height;
-	bob.position.z = conicalPendulum.anchor.z + std::sin(conicalPendulum.angle) * radius;
-	bob.radius = 0.05f;
-	bob.color = 0xffffffff;
+
+	//球体
+	Ball ball{};
+	ball.position = { 0.8f,1.2f,0.3f };
+	ball.mass = 2.0f;
+	ball.radius = 0.05f;
+	ball.color = 0xffffffff;
+	ball.acceleration = { 0.0f,-9.8f,0.0f };
+
+	//反発係数
+	float e = 0.6f;
 
 	//スタートボタン
 	bool isStart = false;
@@ -261,9 +268,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate = { 0.26f,0.0f,0.0f };
 
-	Vector3 a = { 1.0f,2.0f,3.0f };
-	float b = 4.0f;
-	a *= b;
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -280,14 +284,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		if (isStart) {
-			//円錐振り子の角速度を求める
-			conicalPendulum.angularVelocity = std::sqrtf(9.8f / (conicalPendulum.length + std::cos(conicalPendulum.halfApexAngle)));
-			conicalPendulum.angle += conicalPendulum.angularVelocity * deltaTime;
+			ball.velocity += ball.acceleration * deltaTime;
+			ball.position += ball.velocity * deltaTime;
+			if (isCollision(plane, Sphere{ ball.position,ball.radius })) {
+				Vector3 reflected = Reflect(ball.velocity, plane.normal);
+				Vector3 projectToNormal = Project(reflected, plane.normal);
+				Vector3 movingDirection = reflected - projectToNormal;
+				ball.velocity = projectToNormal * e + movingDirection;
+			}
 
-			//Bobの更新
-			bob.position.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
-			bob.position.y = conicalPendulum.anchor.y - height;
-			bob.position.z = conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius;
 		}
 
 		//各種行列の計算
@@ -309,9 +314,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 		//球
-		DrawBall(bob, worldViewProjectionMatrix, viewPortMatrix);
-		//ひも
-		DrawLine(conicalPendulum.anchor, bob.position, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+		DrawBall(ball, worldViewProjectionMatrix, viewPortMatrix);
+		//平面
+		DrawPlane(plane, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -1606,6 +1611,13 @@ void DrawBall(const Ball& ball, const Matrix4x4& viewProjectionMatrix, const Mat
 	uint32_t color = ball.color;
 	//球の描画
 	DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, color);
+}
+
+Vector3 Reflect(const Vector3& input, const Vector3& normal)
+{
+	Vector3 r;
+	r = input - 2 * (Dot(input, normal)) * normal;
+	return r;
 }
 
 
