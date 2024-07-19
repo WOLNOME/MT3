@@ -73,6 +73,14 @@ struct Pendulum {
 	float angularVelocity;
 	float angularAcceleration;
 };
+//円錐振り子
+struct ConicalPendulum {
+	Vector3 anchor;
+	float length;
+	float halfApexAngle;
+	float angle;
+	float angularVelocity;
+};
 
 
 //関数
@@ -226,19 +234,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	Pendulum pendulum{};
-	pendulum.anchor = { 0.0f,1.0f,0.0f };
-	pendulum.length = 0.8f;
-	pendulum.angle = 0.7f;
-	pendulum.angularVelocity = 0.0f;
-	pendulum.angularAcceleration = 0.0f;
+	ConicalPendulum conicalPendulum;
+	conicalPendulum.anchor = { 0.0f,1.0f,0.0f };
+	conicalPendulum.length = 0.8f;
+	conicalPendulum.halfApexAngle = 0.7f;
+	conicalPendulum.angle = 0.0f;
+	conicalPendulum.angularVelocity = 0.0f;
 
 	//振り子先端に取り付ける球体
-	Sphere sphere{};
-	sphere.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
-	sphere.center.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
-	sphere.center.z = pendulum.anchor.z;
-	sphere.radius = 0.05f;
+	Ball bob{};
+	float radius = std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+	float height = std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+	bob.position.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
+	bob.position.y = conicalPendulum.anchor.y - height;
+	bob.position.z = conicalPendulum.anchor.z + std::sin(conicalPendulum.angle) * radius;
+	bob.radius = 0.05f;
+	bob.color = 0xffffffff;
 
 	//スタートボタン
 	bool isStart = false;
@@ -269,14 +280,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		if (isStart) {
-			pendulum.angularAcceleration = -(9.8f / pendulum.length) * std::sin(pendulum.angle);
-			pendulum.angularVelocity += pendulum.angularAcceleration * deltaTime;
-			pendulum.angle += pendulum.angularVelocity * deltaTime;
+			//円錐振り子の角速度を求める
+			conicalPendulum.angularVelocity = std::sqrtf(9.8f / (conicalPendulum.length + std::cos(conicalPendulum.halfApexAngle)));
+			conicalPendulum.angle += conicalPendulum.angularVelocity * deltaTime;
 
-			//先端の更新
-			sphere.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
-			sphere.center.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
-			sphere.center.z = pendulum.anchor.z;
+			//Bobの更新
+			bob.position.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
+			bob.position.y = conicalPendulum.anchor.y - height;
+			bob.position.z = conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius;
 		}
 
 		//各種行列の計算
@@ -298,9 +309,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 		//球
-		DrawSphere(sphere, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+		DrawBall(bob, worldViewProjectionMatrix, viewPortMatrix);
 		//ひも
-		DrawLine(pendulum.anchor, sphere.center, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+		DrawLine(conicalPendulum.anchor, bob.position, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
