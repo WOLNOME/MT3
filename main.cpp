@@ -1492,26 +1492,25 @@ bool isCollision(OBB obb, const Vector3& rotate, const Sphere& sphere)
 
 	//回転行列を生成
 	Matrix4x4 rotateMatrix = Multiply(MakeRotateXMatrix(rotate.x), Multiply(MakeRotateYMatrix(rotate.y), MakeRotateZMatrix(rotate.z)));
-	//回転行列から軸を抽出
-	obb.orientations[0].x = rotateMatrix.m[0][0];
+	//回転行列から軸を取り出す
+	obb.orientations[0].x = rotateMatrix.m[0][0];//obbのx軸
 	obb.orientations[0].y = rotateMatrix.m[0][1];
 	obb.orientations[0].z = rotateMatrix.m[0][2];
-	obb.orientations[1].x = rotateMatrix.m[1][0];
+	obb.orientations[1].x = rotateMatrix.m[1][0];//obbのy軸
 	obb.orientations[1].y = rotateMatrix.m[1][1];
 	obb.orientations[1].z = rotateMatrix.m[1][2];
-	obb.orientations[2].x = rotateMatrix.m[2][0];
+	obb.orientations[2].x = rotateMatrix.m[2][0];//obbのz軸
 	obb.orientations[2].y = rotateMatrix.m[2][1];
 	obb.orientations[2].z = rotateMatrix.m[2][2];
-
-	//回転成分を与える
+	//obbの回転行列を軸から作る
 	obbWorldMatrix.m[0][0] = obb.orientations[0].x;
-	obbWorldMatrix.m[0][1] = obb.orientations[1].x;
-	obbWorldMatrix.m[0][2] = obb.orientations[2].x;
-	obbWorldMatrix.m[1][0] = obb.orientations[0].y;
+	obbWorldMatrix.m[0][1] = obb.orientations[0].y;
+	obbWorldMatrix.m[0][2] = obb.orientations[0].z;
+	obbWorldMatrix.m[1][0] = obb.orientations[1].x;
 	obbWorldMatrix.m[1][1] = obb.orientations[1].y;
-	obbWorldMatrix.m[1][2] = obb.orientations[2].y;
-	obbWorldMatrix.m[2][0] = obb.orientations[0].z;
-	obbWorldMatrix.m[2][1] = obb.orientations[1].z;
+	obbWorldMatrix.m[1][2] = obb.orientations[1].z;
+	obbWorldMatrix.m[2][0] = obb.orientations[2].x;
+	obbWorldMatrix.m[2][1] = obb.orientations[2].y;
 	obbWorldMatrix.m[2][2] = obb.orientations[2].z;
 	//平行移動成分を与える
 	obbWorldMatrix.m[3][0] = obb.center.x;
@@ -1553,13 +1552,13 @@ void DrawOBB(OBB obb, const Vector3& rotate, const Matrix4x4& viewProjectionMatr
 
 	//回転成分を与える
 	obbWorldMatrix.m[0][0] = obb.orientations[0].x;
-	obbWorldMatrix.m[0][1] = obb.orientations[1].x;
-	obbWorldMatrix.m[0][2] = obb.orientations[2].x;
-	obbWorldMatrix.m[1][0] = obb.orientations[0].y;
+	obbWorldMatrix.m[0][1] = obb.orientations[0].y;
+	obbWorldMatrix.m[0][2] = obb.orientations[0].z;
+	obbWorldMatrix.m[1][0] = obb.orientations[1].x;
 	obbWorldMatrix.m[1][1] = obb.orientations[1].y;
-	obbWorldMatrix.m[1][2] = obb.orientations[2].y;
-	obbWorldMatrix.m[2][0] = obb.orientations[0].z;
-	obbWorldMatrix.m[2][1] = obb.orientations[1].z;
+	obbWorldMatrix.m[1][2] = obb.orientations[1].z;
+	obbWorldMatrix.m[2][0] = obb.orientations[2].x;
+	obbWorldMatrix.m[2][1] = obb.orientations[2].y;
 	obbWorldMatrix.m[2][2] = obb.orientations[2].z;
 	//平行移動成分を与える
 	obbWorldMatrix.m[3][0] = obb.center.x;
@@ -1568,7 +1567,7 @@ void DrawOBB(OBB obb, const Vector3& rotate, const Matrix4x4& viewProjectionMatr
 	//OBBを基にAABBを作成
 	AABB aabbOBBLocal{ .min = Multiply(-1.0f,obb.size),.max = obb.size };
 	//AABBをワールド座標に変換する
-	AABB aabbOBBworld{ .min = Transform(aabbOBBLocal.min,obbWorldMatrix),.max = Transform(aabbOBBLocal.min,obbWorldMatrix) };
+	AABB aabbOBBworld{ .min = Transform(aabbOBBLocal.min,obbWorldMatrix),.max = Transform(aabbOBBLocal.max,obbWorldMatrix) };
 	//AABBの描画
 	DrawAABB(aabbOBBworld, viewProjectionMatrix, viewportMatrix, color);
 }
