@@ -82,7 +82,7 @@ struct ConicalPendulum {
 	float angularVelocity;
 };
 //トンネリング対策(カプセル)
-struct Capsule{
+struct Capsule {
 	Segment segment;
 	float radius;
 };
@@ -213,6 +213,8 @@ void DrawLine(const Vector3& worldStartPoint, const Vector3& worldEndPoint, cons
 void DrawBall(const Ball& ball, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix);
 //反射ベクトルを求める関数
 Vector3 Reflect(const Vector3& input, const Vector3& normal);
+//任意軸回転行列の作成関数
+Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float angle);
 
 
 /////////////オーバーロード///////////////
@@ -241,32 +243,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	//平面
-	Plane plane;
-	plane.normal = Normalize({ -0.2f,0.9f,-0.3f });
-	plane.distance = 0.0f;
-
-
-	//球体
-	Ball ball{};
-	ball.position = { 0.8f,1.2f,0.3f };
-	ball.mass = 2.0f;
-	ball.radius = 0.05f;
-	ball.color = 0xffffffff;
-	ball.acceleration = { 0.0f,-9.8f,0.0f };
-
-	//反発係数
-	float e = 0.6f;
-
-	//スタートボタン
-	bool isStart = false;
-
-	//デルタタイム
-	float deltaTime = 1.0f / 60.0f;
-
 	//カメラの座標と角度
 	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate = { 0.26f,0.0f,0.0f };
+
+
+	//変数
+	Vector3 axis = Normalize({ 1.0f,1.0f,1.0f });
+	float angle = 0.44f;
+	Matrix4x4 rotateMatrix = MakeRotateAxisAngle(axis, angle);
 
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -283,17 +268,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		if (isStart) {
-			ball.velocity += ball.acceleration * deltaTime;
-			ball.position += ball.velocity * deltaTime;
-			if (isCollision(plane, Sphere{ ball.position,ball.radius })) {
-				Vector3 reflected = Reflect(ball.velocity, plane.normal);
-				Vector3 projectToNormal = Project(reflected, plane.normal);
-				Vector3 movingDirection = reflected - projectToNormal;
-				ball.velocity = projectToNormal * e + movingDirection;
-			}
 
-		}
+
+
 
 		//各種行列の計算
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f });
@@ -312,11 +289,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-
-		//球
-		DrawBall(ball, worldViewProjectionMatrix, viewPortMatrix);
-		//平面
-		DrawPlane(plane, worldViewProjectionMatrix, viewPortMatrix, 0xffffffff);
+		MatrixScreenPrintf(0, 0, rotateMatrix, "rotateMatrix");
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -324,11 +297,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//imgui
 		ImGui::Begin("Window");
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		if (ImGui::Button("start")) {
-			isStart = true;
-		}
+
 		ImGui::End();
 
 		///
@@ -543,7 +512,7 @@ void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* name)
 	Novice::ScreenPrintf(x, y, "%s", name);
 	for (int row = 0; row < 4; row++) {
 		for (int column = 0; column < 4; column++) {
-			Novice::ScreenPrintf(x + column * kColumnWidth, y + (row + 1) * kRowHeight, "%6.02f", matrix.m[row][column]);
+			Novice::ScreenPrintf(x + column * kColumnWidth, y + (row + 1) * kRowHeight, "%6.03f", matrix.m[row][column]);
 		}
 	}
 }
@@ -1618,6 +1587,28 @@ Vector3 Reflect(const Vector3& input, const Vector3& normal)
 	Vector3 r;
 	r = input - 2 * (Dot(input, normal)) * normal;
 	return r;
+}
+
+Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float angle)
+{
+	Matrix4x4 c;
+	c.m[0][0] = (axis.x * axis.x) * (1 - std::cosf(angle)) + (std::cosf(angle));
+	c.m[0][1] = (axis.x * axis.y) * (1 - std::cosf(angle)) + (axis.z * std::sinf(angle));
+	c.m[0][2] = (axis.x * axis.z) * (1 - std::cosf(angle)) - (axis.y * std::sinf(angle));
+	c.m[0][3] = 0.0f;
+	c.m[1][0] = (axis.x * axis.y) * (1 - std::cosf(angle)) - (axis.z * std::sinf(angle));
+	c.m[1][1] = (axis.y * axis.y) * (1 - std::cosf(angle)) + (std::cosf(angle));
+	c.m[1][2] = (axis.y * axis.z) * (1 - std::cosf(angle)) + (axis.x * std::sinf(angle));
+	c.m[1][3] = 0.0f;
+	c.m[2][0] = (axis.x * axis.z) * (1 - std::cosf(angle)) + (axis.y * std::sinf(angle));
+	c.m[2][1] = (axis.y * axis.z) * (1 - std::cosf(angle)) - (axis.x * std::sinf(angle));
+	c.m[2][2] = (axis.z * axis.z) * (1 - std::cosf(angle)) + (std::cosf(angle));
+	c.m[2][3] = 0.0f;
+	c.m[3][0] = 0.0f;
+	c.m[3][1] = 0.0f;
+	c.m[3][2] = 0.0f;
+	c.m[3][3] = 1.0f;
+	return c;
 }
 
 
