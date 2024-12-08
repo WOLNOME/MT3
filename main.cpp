@@ -215,6 +215,9 @@ void DrawBall(const Ball& ball, const Matrix4x4& viewProjectionMatrix, const Mat
 Vector3 Reflect(const Vector3& input, const Vector3& normal);
 //任意軸回転行列の作成関数
 Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float angle);
+Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float sinTheta, float cosTheta);
+//ある方向からある方向への回転
+Matrix4x4 DirectionToDirection(const Vector3& from, const Vector3& to);
 
 
 /////////////オーバーロード///////////////
@@ -249,9 +252,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//変数
-	Vector3 axis = Normalize({ 1.0f,1.0f,1.0f });
-	float angle = 0.44f;
-	Matrix4x4 rotateMatrix = MakeRotateAxisAngle(axis, angle);
+	Vector3 from0 = Normalize(Vector3(1.0f, 0.7f, 0.5f));
+	Vector3 to0 = -from0;
+	Vector3 from1 = Normalize(Vector3(-0.6f, 0.9f, 0.2f));
+	Vector3 to1 = Normalize(Vector3(0.4f, 0.7f, -0.5f));
+	Matrix4x4 rotateMatrix0 = DirectionToDirection(
+		Normalize(Vector3(1.0f, 0.0f, 0.0f)), Normalize(Vector3(-1.0f, 0.0f, 0.0f))
+	);
+	Matrix4x4 rotateMatrix1 = DirectionToDirection(from0, to0);
+	Matrix4x4 rotateMatrix2 = DirectionToDirection(from1, to1);
 
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -289,7 +298,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 0, rotateMatrix, "rotateMatrix");
+		MatrixScreenPrintf(0, 0, rotateMatrix0, "rotateMatrix0");
+		MatrixScreenPrintf(0, kRowHeight * 5, rotateMatrix1, "rotateMatrix1");
+		MatrixScreenPrintf(0, kRowHeight * 10, rotateMatrix2, "rotateMatrix2");
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -1608,6 +1619,56 @@ Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float angle)
 	c.m[3][1] = 0.0f;
 	c.m[3][2] = 0.0f;
 	c.m[3][3] = 1.0f;
+	return c;
+}
+
+Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float sinTheta, float cosTheta)
+{
+	Matrix4x4 c;
+	c.m[0][0] = (axis.x * axis.x) * (1 - cosTheta) + (cosTheta);
+	c.m[0][1] = (axis.x * axis.y) * (1 - cosTheta) + (axis.z * sinTheta);
+	c.m[0][2] = (axis.x * axis.z) * (1 - cosTheta) - (axis.y * sinTheta);
+	c.m[0][3] = 0.0f;
+	c.m[1][0] = (axis.x * axis.y) * (1 - cosTheta) - (axis.z * sinTheta);
+	c.m[1][1] = (axis.y * axis.y) * (1 - cosTheta) + (cosTheta);
+	c.m[1][2] = (axis.y * axis.z) * (1 - cosTheta) + (axis.x * sinTheta);
+	c.m[1][3] = 0.0f;
+	c.m[2][0] = (axis.x * axis.z) * (1 - cosTheta) + (axis.y * sinTheta);
+	c.m[2][1] = (axis.y * axis.z) * (1 - cosTheta) - (axis.x * sinTheta);
+	c.m[2][2] = (axis.z * axis.z) * (1 - cosTheta) + (cosTheta);
+	c.m[2][3] = 0.0f;
+	c.m[3][0] = 0.0f;
+	c.m[3][1] = 0.0f;
+	c.m[3][2] = 0.0f;
+	c.m[3][3] = 1.0f;
+	return c;
+}
+
+Matrix4x4 DirectionToDirection(const Vector3& from, const Vector3& to)
+{
+	Matrix4x4 c;
+	//軸を割り出す
+	Vector3 n;
+	n = Normalize(Cross(from, to));
+	if (
+		Normalize(from).x == Normalize(-to).x &&
+		Normalize(from).y == Normalize(-to).y &&
+		Normalize(from).z == Normalize(-to).z
+		) {
+		//fromとtoが逆ベクトルだったら
+		if (from.x != 0.0f || from.y != 0.0f) {
+			n = Vector3(from.y, -from.x, 0.0f);
+		}
+		else if (from.x != 0.0f || from.z != 0.0f) {
+			n = Vector3(from.z, 0.0f, -from.x);
+		}
+	}
+
+	//角度を割り出す
+	float sinTheta = Length(Cross(from, to));
+	float cosTheta = Dot(from, to);
+	//任意軸の回転行列に入れる
+	c = MakeRotateAxisAngle(n, sinTheta, cosTheta);
 	return c;
 }
 
