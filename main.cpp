@@ -271,6 +271,8 @@ Quaternion operator*(const Quaternion& q, float scalar) { return scalar * q; }
 //単項演算子
 Vector3 operator-(const Vector3& v) { return { -v.x,-v.y,-v.z }; }
 Vector3 operator+(const Vector3& v) { return v; }
+Quaternion operator-(const Quaternion& q) { return { -q.x,-q.y,-q.z,-q.w }; }
+Quaternion operator+(const Quaternion& q) { return q; }
 //複合代入演算子→各構造体定義ヘッダーに入っている
 
 
@@ -1798,7 +1800,7 @@ Vector3 RotateVector(const Vector3& vector, const Quaternion& quaternion)
 {
 	Vector3 c;
 	Quaternion vtq = { vector.x,vector.y, vector.z, 0.0f };
-	Quaternion result = Quaternion(Multiply(Multiply(quaternion, vtq), Inverse(quaternion)));
+	Quaternion result = quaternion * vtq * Inverse(quaternion);
 	c.x = result.x;
 	c.y = result.y;
 	c.z = result.z;
@@ -1846,7 +1848,7 @@ Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t)
 	float dot = Dot(q0, q1);
 	if (dot < 0.0f) {
 		//もう片方の回転を利用する
-		q0c = Multiply(-1.0f, q0c);
+		q0c = -q0c;
 		//内積も反転
 		dot = -dot;
 	}
