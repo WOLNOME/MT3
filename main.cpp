@@ -245,6 +245,12 @@ Quaternion MakeRotateAxisAngleQuaternion(const Vector3& axis, float angle);
 Vector3 RotateVector(const Vector3& vector, const Quaternion& quaternion);
 //Quaternionから回転行列を求める
 Matrix4x4 MakeRotateMatrix(const Quaternion& quaternion);
+//Quaternionの内積
+float Dot(const Quaternion& q1, const Quaternion& q2);
+//scalar*Quaternion
+Quaternion Multiply(float scalar, const Quaternion& q);
+//球面線形補完
+Quaternion Slerp(const Quaternion& q0, const  Quaternion& q1, float t);
 
 
 /////////////オーバーロード///////////////
@@ -257,6 +263,11 @@ Vector3 operator/(const Vector3& v, float s) { return Multiply(1.0f / s, v); }
 Matrix4x4 operator+(const Matrix4x4& m1, const Matrix4x4& m2) { return Add(m1, m2); }
 Matrix4x4 operator-(const Matrix4x4& m1, const Matrix4x4& m2) { return Subtract(m1, m2); }
 Matrix4x4 operator*(const Matrix4x4& m1, const Matrix4x4& m2) { return Multiply(m1, m2); }
+Quaternion operator+(const Quaternion& q1, const Quaternion& q2) { return Quaternion(q1.x + q2.x, q1.y + q2.y, q1.z + q2.z, q1.w + q2.w); }
+Quaternion operator-(const Quaternion& q1, const Quaternion& q2) { return Quaternion(q1.x - q2.x, q1.y - q2.y, q1.z - q2.z, q1.w - q2.w); }
+Quaternion operator*(const Quaternion& q1, const Quaternion& q2) { return Multiply(q1, q2); }
+Quaternion operator*(float scalar, const Quaternion& q) { return Multiply(scalar, q); }
+Quaternion operator*(const Quaternion& q, float scalar) { return scalar * q; }
 //単項演算子
 Vector3 operator-(const Vector3& v) { return { -v.x,-v.y,-v.z }; }
 Vector3 operator+(const Vector3& v) { return v; }
@@ -279,11 +290,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//変数
-	Quaternion rotation = MakeRotateAxisAngleQuaternion(Normalize(Vector3{ 1.0f,0.4f,-0.2f }), 0.45f);
-	Vector3 pointY = { 2.1f,-0.9f,1.3f };
-	Matrix4x4 rotateMatrix = MakeRotateMatrix(rotation);
-	Vector3 rotateByQuaternion = RotateVector(pointY, rotation);
-	Vector3 rotateByMatrix = Transform(pointY, rotateMatrix);
+	Quaternion rotation0 = MakeRotateAxisAngleQuaternion({ 0.71f,0.71f,0.0f }, 0.3f);
+	Quaternion rotation1 = MakeRotateAxisAngleQuaternion({ 0.71f,0.0f,0.71f }, 3.141592f);
+
+	Quaternion interpolate0 = Slerp(rotation0, rotation1, 0.0f);
+	Quaternion interpolate1 = Slerp(rotation0, rotation1, 0.3f);
+	Quaternion interpolate2 = Slerp(rotation0, rotation1, 0.5f);
+	Quaternion interpolate3 = Slerp(rotation0, rotation1, 0.7f);
+	Quaternion interpolate4 = Slerp(rotation0, rotation1, 1.0f);
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -320,11 +334,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		QuaternionScreenPrintf(0, kRowHeight * 0, rotation, " : rotation");
-		MatrixScreenPrintf(0, kRowHeight * 1, rotateMatrix, "rotateMatrix");
-		VectorScreenPrintf(0, kRowHeight * 6, rotateByQuaternion, " : rotateByQuaternion");
-		VectorScreenPrintf(0, kRowHeight * 7, rotateByMatrix, " : rotateByMatrix");
-
+		QuaternionScreenPrintf(0, kRowHeight * 0, interpolate0, " : interpolate0");
+		QuaternionScreenPrintf(0, kRowHeight * 1, interpolate1, " : interpolate1");
+		QuaternionScreenPrintf(0, kRowHeight * 2, interpolate2, " : interpolate2");
+		QuaternionScreenPrintf(0, kRowHeight * 3, interpolate3, " : interpolate3");
+		QuaternionScreenPrintf(0, kRowHeight * 4, interpolate4, " : interpolate4");
 
 		//グリッド
 		DrawGrid(worldViewProjectionMatrix, viewPortMatrix);
@@ -1810,6 +1824,41 @@ Matrix4x4 MakeRotateMatrix(const Quaternion& quaternion)
 	c.m[3][1] = 0.0f;
 	c.m[3][2] = 0.0f;
 	c.m[3][3] = 1.0f;
+	return c;
+}
+
+float Dot(const Quaternion& q1, const Quaternion& q2)
+{
+	return q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
+}
+
+Quaternion Multiply(float scalar, const Quaternion& q)
+{
+	return { q.x * scalar,q.y * scalar, q.z * scalar, q.w * scalar };
+}
+
+Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t)
+{
+	Quaternion c;
+	Quaternion q0c = q0;
+	Quaternion q1c = q1;
+	//q0とq1の内積
+	float dot = Dot(q0, q1);
+	if (dot < 0.0f) {
+		//もう片方の回転を利用する
+		q0c = Multiply(-1.0f, q0c);
+		//内積も反転
+		dot = -dot;
+	}
+	//なす角を求める
+	float theta = std::acosf(dot);
+	//thetaとsinを使って補間係数scale0,scale1を求める
+	float sin_theta = std::sqrt(1.0f - dot * dot);
+	float scale0 = std::sin((1.0f - t) * theta) / sin_theta;
+	float scale1 = std::sin(t * theta) / sin_theta;
+	//補間
+	c = scale0 * q0c + scale1 * q1c;
+
 	return c;
 }
 
