@@ -293,7 +293,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//変数
 	Quaternion rotation0 = MakeRotateAxisAngleQuaternion({ 0.71f,0.71f,0.0f }, 0.3f);
-	Quaternion rotation1 = MakeRotateAxisAngleQuaternion({ 0.71f,0.0f,0.71f }, 3.141592f);
+	Quaternion rotation1 = { -rotation0.x, -rotation0.y, -rotation0.z, -rotation0.w };
 
 	Quaternion interpolate0 = Slerp(rotation0, rotation1, 0.0f);
 	Quaternion interpolate1 = Slerp(rotation0, rotation1, 0.3f);
@@ -1852,6 +1852,13 @@ Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t)
 		//内積も反転
 		dot = -dot;
 	}
+	//内積が1に近い場合、線形補完を使用
+	const float EPSILON = 5e-4f;//0.0005
+	if (dot >= 1.0f - EPSILON) {
+		c = q0c * (1.0f - t) + q1c * t;
+		return c;
+	}
+
 	//なす角を求める
 	float theta = std::acosf(dot);
 	//thetaとsinを使って補間係数scale0,scale1を求める
